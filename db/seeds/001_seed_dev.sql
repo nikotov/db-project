@@ -1,4 +1,9 @@
--- Development seed data.
+-- Development seed data for baseline lookup tables.
 
-INSERT INTO healthcheck (status)
-VALUES ('ok');
+INSERT INTO final.member_status (name)
+VALUES ('active'), ('inactive')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO final.family (name)
+VALUES ('Sample Family')
+ON CONFLICT DO NOTHING;
