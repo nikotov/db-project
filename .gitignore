@@ -1,0 +1,28 @@
+# Environment files
+.env
+.venv/
+
+# Python cache (if you choose Python later)
+__pycache__/
+*.pyc
+
+# Node modules (if you choose Node later)
+node_modules/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+
+# Database local artifacts
+*.sqlite3
+*.db
+
+# Logs
+*.log
+logs/
+
+# Build outputs
+dist/
+build/
+coverage/
