@@ -14,6 +14,9 @@ Starter structure for a class final project using PostgreSQL.
 - `docs/`: Requirement notes and architecture decisions.
 - `tests/db/`: DB-focused test notes and future integration tests.
 
+Backend note:
+- `backend/` follows hexagonal architecture (`domain/`, `ports/`, `adapters/`) and uses Alembic for migrations.
+
 ## DER to PostgreSQL note
 
 The file `schema_final.sql` uses MySQL syntax from Workbench.
@@ -40,4 +43,5 @@ Note:
 
 1. Write initial schema in `db/migrations/0001_initial_schema.sql`.
 2. Add seed data in `db/seeds/001_seed_dev.sql`.
-3. Decide application stack in `src/` and connect to PostgreSQL.
+3. Implement backend use cases in `backend/app/domain/` and adapters in `backend/app/adapters/`.
+4. Create DB migrations in `backend/alembic/versions/` and apply with Alembic.
