@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from app.domain.enums import Gender, MemberStatus
 
 @dataclass
@@ -16,8 +16,8 @@ class Member:
     gender: Gender
     phone: str | None
     email: str | None
-    created_at: date
-    updated_at: date
+    created_at: datetime
+    updated_at: datetime
     marital_status: str | None
     family_role: str | None
     is_baptized: bool | None

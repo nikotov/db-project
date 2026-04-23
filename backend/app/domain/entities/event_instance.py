@@ -9,4 +9,4 @@ class EventInstance:
     event_series_id: int
     start_datetime: datetime
     end_datetime: datetime 
-    attendees_count: int | None
+    attendee_count: int | None
