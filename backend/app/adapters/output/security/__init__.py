@@ -1,0 +1,1 @@
+"""Security-related output adapters."""
