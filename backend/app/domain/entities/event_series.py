@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
-from app.domain.enums import AttendanceType
+from app.domain.enums.attendance_type import AttendanceType
 
 @dataclass
 class EventSeries:
