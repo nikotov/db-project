@@ -1,10 +1,9 @@
 from enum import Enum
 
+
 class AttendanceType(str, Enum):
-
-    GENERAL = "GENERAL"
-    INDIVIDUAL = "INDIVIDUAL"
-
+    GENERAL = "general"
+    INDIVIDUAL = "individual"
 
     def __str__(self) -> str:
         return self.value

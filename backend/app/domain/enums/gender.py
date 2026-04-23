@@ -1,10 +1,10 @@
 from enum import Enum
 
-class Gender(str, Enum):
 
-    MALE = "MALE"
-    FEMALE = "FEMALE"
-    OTHER = "OTHER"
+class Gender(str, Enum):
+    MALE = "M"
+    FEMALE = "F"
+    OTHER = "Other"
 
     def __str__(self) -> str:
         return self.value

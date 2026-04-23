@@ -78,7 +78,7 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `final`.`event_series` (
   `id` INT NOT NULL AUTO_INCREMENT,
-  `title` VARCHAR(45) NOT NULL,
+  `name` VARCHAR(45) NOT NULL,
   `description` TEXT NULL,
   `attendance_type` ENUM('individual', 'general') NOT NULL,
   `is_recurring` TINYINT NOT NULL,
@@ -109,9 +109,9 @@ ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `final`.`event_attendance`
+-- Table `final`.`event_member_attendance`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `final`.`event_attendance` (
+CREATE TABLE IF NOT EXISTS `final`.`event_member_attendance` (
   `member_id` INT NOT NULL,
   `event_instance_id` INT NOT NULL,
   `status` ENUM('attended', 'absent') NOT NULL,
@@ -187,14 +187,15 @@ ENGINE = InnoDB;
 -- Table `final`.`group_membership`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `final`.`group_membership` (
+  `id` INT NOT NULL AUTO_INCREMENT,
   `small_group_id` INT NOT NULL,
   `member_id` INT NOT NULL,
   `joined_at` DATE NOT NULL,
   `left_at` DATE NULL,
   `role` ENUM('member', 'leader', 'assistant') NOT NULL,
-  PRIMARY KEY (`small_group_id`, `member_id`, `joined_at`),
   INDEX `fk_small_group_has_member_member1_idx` (`member_id` ASC) VISIBLE,
   INDEX `fk_small_group_has_member_small_group1_idx` (`small_group_id` ASC) VISIBLE,
+  PRIMARY KEY (`id`),
   CONSTRAINT `fk_small_group_has_member_small_group1`
     FOREIGN KEY (`small_group_id`)
     REFERENCES `final`.`small_group` (`id`)
@@ -228,7 +229,6 @@ CREATE TABLE IF NOT EXISTS `final`.`small_group_tag_map` (
   `small_group_id` INT NOT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`group_tag_id`, `small_group_id`),
   INDEX `fk_group_tag_has_small_group_small_group1_idx` (`small_group_id` ASC) VISIBLE,
   INDEX `fk_group_tag_has_small_group_group_tag1_idx` (`group_tag_id` ASC) VISIBLE,
   CONSTRAINT `fk_group_tag_has_small_group_group_tag1`
@@ -289,6 +289,24 @@ CREATE TABLE IF NOT EXISTS `final`.`user_account` (
   `last_login` DATETIME NULL,
   PRIMARY KEY (`id`),
   UNIQUE INDEX `username_UNIQUE` (`username` ASC) VISIBLE)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `final`.`user_logs`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `final`.`user_logs` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `user_account_id` INT NOT NULL,
+  `action_type` VARCHAR(45) NOT NULL,
+  `description` VARCHAR(100) NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `fk_user_logs_user_account1`
+    FOREIGN KEY (`user_account_id`)
+    REFERENCES `final`.`user_account` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
 ENGINE = InnoDB;
 
 

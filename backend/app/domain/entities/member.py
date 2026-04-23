@@ -1,26 +1,27 @@
 from dataclasses import dataclass
-from datetime import date
-from app.domain.enums import Gender, MemberStatus
+from datetime import date, datetime
+from typing import Optional
+
+from app.domain.enums import Gender, MaritalStatus
+
 
 @dataclass
 class Member:
-    """Represents a member in the system."""
-
     id: int
     name: str
-    middle_name: str
-    last_name_paternal: str
-    last_name_maternal: str
-    address: str
-    birth_date: date
+    middle_name: Optional[str]
+    last_name_parental: str
+    last_name_maternal: Optional[str]
+    address: Optional[str]
+    birth_date: Optional[date]
     gender: Gender
-    phone: str
-    email: str
-    created_at: date
-    updated_at: date
-    marital_status: str
-    family_role: str
-    is_baptized: bool
-    baptized_location: str
-    member_status: MemberStatus
+    phone: Optional[str]
+    email: Optional[str]
+    created_at: datetime
+    updated_at: Optional[datetime]
+    marital_status: Optional[MaritalStatus]
+    family_role: Optional[str]
+    is_baptized: Optional[bool]
+    baptized_location: Optional[str]
+    member_status_id: int
     family_id: int

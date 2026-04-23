@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.config import settings
 from app.database import Base
+from app.adapters.output.persistence import models  # noqa: F401
 
 # Import models so Alembic autogenerate can detect metadata changes.
 # Example: from app.adapters.output.persistence import models  # noqa: F401
