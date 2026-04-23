@@ -250,7 +250,7 @@ ENGINE = InnoDB;
 CREATE TABLE IF NOT EXISTS `final`.`attendance_group` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(45) NOT NULL,
-  `decription` VARCHAR(100) NULL,
+  `description` VARCHAR(100) NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB;
 
