@@ -4,13 +4,14 @@ Starter structure for a class final project using PostgreSQL.
 
 ## Project structure
 
+- `backend/`: Backend application code.
+- `frontend/`: Frontend application code.
 - `db/init/`: SQL scripts automatically executed on first PostgreSQL container start.
 - `db/migrations/`: Versioned schema changes (`0001_...sql`, `0002_...sql`, etc.).
 - `db/seeds/`: Development/test seed data.
 - `db/scripts/`: Helper scripts for local DB workflows.
 - `schema_final.sql`: Original DER export file (MySQL Workbench format).
 - `docs/`: Requirement notes and architecture decisions.
-- `src/`: Application code (to be decided later).
 - `tests/db/`: DB-focused test notes and future integration tests.
 
 ## DER to PostgreSQL note
