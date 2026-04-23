@@ -8,19 +8,19 @@ class Member:
 
     id: int
     name: str
-    middle_name: str
+    middle_name: str | None
     last_name_paternal: str
-    last_name_maternal: str
-    address: str
-    birth_date: date
+    last_name_maternal: str | None
+    address: str | None
+    birth_date: date | None
     gender: Gender
-    phone: str
-    email: str
+    phone: str | None
+    email: str | None
     created_at: date
     updated_at: date
-    marital_status: str
-    family_role: str
-    is_baptized: bool
-    baptized_location: str
+    marital_status: str | None
+    family_role: str | None
+    is_baptized: bool | None
+    baptized_location: str | None
     member_status: MemberStatus
     family_id: int
