@@ -42,12 +42,10 @@ services:
       target: frontend
     container_name: db_project_frontend
     restart: unless-stopped
-    environment:
-      BACKEND_URL: http://backend:8000
     depends_on:
       - backend
     ports:
-      - "8501:8501"
+      - "3000:80"
 
 volumes:
   postgres_data:

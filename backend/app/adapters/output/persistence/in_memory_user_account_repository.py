@@ -18,8 +18,18 @@ class InMemoryUserAccountRepository(UserAccountRepositoryPort):
     """Simple in-memory repository for auth flows without DB integration."""
 
     def __init__(self) -> None:
-        self._users_by_username: dict[str, _InMemoryUser] = {}
-        self._next_id = 1
+        self._users_by_username: dict[str, _InMemoryUser] = {
+            "admin": _InMemoryUser(
+                id=1,
+                username="admin",
+                password_hash=(
+                    "pbkdf2_sha256$200000$"
+                    "2HjThhFU6syzmHvintRxn4Vlm55zEOBtLhGjHb+8u9c8cBVoDpGUGoy14qa90+Pb"
+                ),
+                created_at=datetime.utcnow(),
+            )
+        }
+        self._next_id = 2
 
     def exists_by_username(self, username: str) -> bool:
         return username in self._users_by_username
