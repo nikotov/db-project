@@ -1,111 +1,128 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { login } from "./api/client";
+import { fetchDashboardMetrics, login } from "./api/client";
+import LoginView from "./modules/login/LoginView";
+import CommunityShell from "./modules/community/CommunityShell";
 
 const USER_STORAGE_KEY = "db-project-user";
 
 function readStoredUser() {
-    const raw = window.sessionStorage.getItem(USER_STORAGE_KEY);
-    if (!raw) {
-        return null;
-    }
+  const raw = window.sessionStorage.getItem(USER_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
 
-    try {
-        return JSON.parse(raw);
-    } catch {
-        return null;
-    }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export default function App() {
-    const [user, setUser] = useState(() => readStoredUser());
-    const [username, setUsername] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(() => readStoredUser());
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [activePage, setActivePage] = useState("dashboard");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [metrics, setMetrics] = useState({ membersCount: 0 });
 
-    const isLoggedIn = useMemo(() => Boolean(user?.access_token), [user]);
+  const isLoggedIn = useMemo(() => Boolean(user?.access_token), [user]);
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-        setError("");
+  useEffect(() => {
+    let active = true;
 
-        if (!username.trim() || !password.trim()) {
-            setError("Please fill in all fields.");
-            return;
-        }
+    async function loadDashboard() {
+      if (!user?.access_token) {
+        return;
+      }
 
-        setLoading(true);
+      setDashboardLoading(true);
+      const data = await fetchDashboardMetrics(user.access_token);
 
-        try {
-            const result = await login(username, password);
-            if (!result?.access_token) {
-                setError("Invalid username or password.");
-                return;
-            }
+      if (active) {
+        setMetrics(data);
+        setDashboardLoading(false);
+      }
+    }
 
-            const nextUser = { username, ...result };
-            setUser(nextUser);
-            window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
-            setPassword("");
-        } catch {
-            setError("Unexpected error while contacting the backend.");
-        } finally {
-            setLoading(false);
-        }
+    loadDashboard();
+
+    return () => {
+      active = false;
     };
+  }, [user]);
 
-    const handleLogout = () => {
-        setUser(null);
-        setUsername("");
-        setPassword("");
-        setError("");
-        window.sessionStorage.removeItem(USER_STORAGE_KEY);
-};
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+
+    if (!username.trim() || !password.trim()) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await login(username, password);
+      if (!result?.access_token) {
+        setError("Invalid username or password.");
+        return;
+      }
+
+      const nextUser = { username, ...result };
+      setUser(nextUser);
+      window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
+      setPassword("");
+    } catch {
+      setError("Unexpected error while contacting the backend.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setUsername("");
+    setPassword("");
+    setError("");
+    setActivePage("dashboard");
+    setMetrics({ membersCount: 0 });
+    window.sessionStorage.removeItem(USER_STORAGE_KEY);
+  };
+
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen((prev) => !prev);
+  };
 
   return (
     <main className="app-shell">
-      <section className="card">
-        <h1>DB Project</h1>
-
-        {isLoggedIn ? (
-          <div className="logged-state">
-            <p>
-              Logged in as <strong>{user.username}</strong>
-            </p>
-            <button type="button" onClick={handleLogout}>
-              Logout
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="login-form">
-            <label htmlFor="username">Username</label>
-            <input
-              id="username"
-              name="username"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              autoComplete="username"
-            />
-
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-            />
-
-            {error ? <p className="error-text">{error}</p> : null}
-
-            <button type="submit" disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
-            </button>
-          </form>
-        )}
-      </section>
+      {isLoggedIn ? (
+        <CommunityShell
+          user={user}
+          activePage={activePage}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={handleToggleSidebar}
+          onSelectPage={setActivePage}
+          onLogout={handleLogout}
+          dashboardLoading={dashboardLoading}
+          metrics={metrics}
+        />
+      ) : (
+        <LoginView
+          username={username}
+          password={password}
+          error={error}
+          loading={loading}
+          onUsernameChange={setUsername}
+          onPasswordChange={setPassword}
+          onSubmit={handleSubmit}
+        />
+      )}
     </main>
   );
 }
