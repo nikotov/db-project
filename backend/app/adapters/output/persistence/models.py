@@ -53,6 +53,21 @@ class MaritalStatusEnum(enum.Enum):
     Widowed = "Widowed"
 
 
+class RecurrenceTypeEnum(enum.Enum):
+    daily = "daily"
+    weekly = "weekly"
+    monthly = "monthly"
+    yearly = "yearly"
+    none = "none"
+
+class EventSeriesStatusEnum(enum.Enum):
+    draft = "draft"
+    active = "active"
+    paused = "paused"
+    cancelled = "cancelled"
+    completed = "completed"
+
+
 class EventSeries(Base):
     __tablename__ = "event_series"
 
@@ -60,8 +75,16 @@ class EventSeries(Base):
     name: Mapped[str] = mapped_column(String(45), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     attendance_type: Mapped[EventAttendanceTypeEnum] = mapped_column(Enum(EventAttendanceTypeEnum), nullable=False)
-    is_recurring: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    recurrence_type: Mapped[RecurrenceTypeEnum] = mapped_column(Enum(RecurrenceTypeEnum), nullable=False, default=RecurrenceTypeEnum.none)
     recurrence_rule: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    status: Mapped[EventSeriesStatusEnum] = mapped_column(
+        Enum(EventSeriesStatusEnum),
+        nullable=False,
+        default=EventSeriesStatusEnum.active,
+    )
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    start_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
 
@@ -73,6 +96,7 @@ class EventInstance(Base):
     __tablename__ = "event_instance"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     start_datetime: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     end_datetime: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     attendee_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
