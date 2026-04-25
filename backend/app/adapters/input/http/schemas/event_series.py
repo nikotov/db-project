@@ -29,9 +29,9 @@ class EventSeriesCreate(BaseModel):
     name: str = Field(min_length=1, max_length=45)
     description: Optional[str] = Field(default=None, max_length=255)
     attendance_type: AttendanceType
-    recurrence_type: RecurrenceType = RecurrenceType.none
+    recurrence_type: RecurrenceType = RecurrenceType.NONE
     recurrence_rule: Optional[str] = Field(default=None, max_length=255)
-    status: EventSeriesStatus = EventSeriesStatus.active
+    status: EventSeriesStatus = EventSeriesStatus.ACTIVE
     location: Optional[str] = Field(default=None, max_length=255)
     start_time: Optional[time] = None
     end_time: Optional[time] = None

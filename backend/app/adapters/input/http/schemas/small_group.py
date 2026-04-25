@@ -31,7 +31,7 @@ class SmallGroupCreate(BaseModel):
     meeting_day: DayOfWeek
     meeting_time: time
     location: Optional[str] = Field(default=None, max_length=255)
-    status: SmallGroupStatus = SmallGroupStatus.active
+    status: SmallGroupStatus = SmallGroupStatus.ACTIVE
     tag_ids: list[int] = Field(default_factory=list)
 
 
@@ -54,7 +54,7 @@ class SmallGroupResponse(BaseModel):
 class GroupMembershipCreate(BaseModel):
     member_id: int = Field(ge=1)
     small_group_id: int = Field(ge=1)
-    role: GroupMembershipStatus = GroupMembershipStatus.member
+    role: GroupMembershipStatus = GroupMembershipStatus.MEMBER
 
 
 class GroupMembershipResponse(BaseModel):

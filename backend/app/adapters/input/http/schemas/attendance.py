@@ -19,8 +19,8 @@ class GeneralAttendanceUpsert(BaseModel):
 class MemberAttendanceUpsert(BaseModel):
     event_instance_id: int = Field(ge=1)
     member_id: int = Field(ge=1)
-    attendance_status: MemberAttendanceStatus = MemberAttendanceStatus.pending
-    registration_status: RegistrationStatus = RegistrationStatus.registered
+    attendance_status: MemberAttendanceStatus = MemberAttendanceStatus.PENDING
+    registration_status: RegistrationStatus = RegistrationStatus.REGISTERED
 
 
 class MemberAttendanceResponse(BaseModel):
