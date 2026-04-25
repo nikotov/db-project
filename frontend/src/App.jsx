@@ -10,7 +10,7 @@ import CalendarPage from "./modules/community/calendar/CalendarPage";
 import EventsPage from "./modules/community/events/EventsPage";
 import SmallGroupsPage from "./modules/community/small-groups/SmallGroupsPage";
 import AttendancePage from "./modules/community/attendance/AttendancePage";
-import LogsPage from "./modules/community/logs/LogsPage";
+import LogsPage from "./modules/community/user-logs/LogsPage";
 
 const USER_STORAGE_KEY = "db-project-user";
 const INITIAL_DASHBOARD_METRICS = {

@@ -83,8 +83,8 @@ CREATE TABLE IF NOT EXISTS `final`.`event_series` (
   `attendance_type` ENUM('individual', 'general') NOT NULL,
   `is_recurring` TINYINT NOT NULL,
   `recurrence_rule` TEXT NULL,
-  `start_datetime` DATETIME NOT NULL,
-  `end_datetime` VARCHAR(45) NOT NULL,
+  `start_time` TIME NOT NULL,
+  `end_time` TIME NOT NULL,
   `location` VARCHAR(45) NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS `final`.`event_instance` (
   `location` VARCHAR(45) NULL,
   `event_series_id` INT NOT NULL,
   `attendee_count` INT NULL,
+  `attendance_notes` VARCHAR(45) NULL,
   PRIMARY KEY (`id`),
   INDEX `fk_event_instance_event_series1_idx` (`event_series_id` ASC) VISIBLE,
   CONSTRAINT `fk_event_instance_event_series1`
@@ -118,7 +119,8 @@ ENGINE = InnoDB;
 CREATE TABLE IF NOT EXISTS `final`.`event_member_attendance` (
   `member_id` INT NOT NULL,
   `event_instance_id` INT NOT NULL,
-  `status` ENUM('attended', 'absent') NOT NULL,
+  `registered_status` ENUM('registered', 'cancelled') NOT NULL,
+  `attendance_status` ENUM('present', 'absent', 'excused') NOT NULL,
   PRIMARY KEY (`member_id`, `event_instance_id`),
   INDEX `fk_member_has_event_instance_event_instance1_idx` (`event_instance_id` ASC) VISIBLE,
   INDEX `fk_member_has_event_instance_member1_idx` (`member_id` ASC) VISIBLE,
@@ -183,6 +185,7 @@ CREATE TABLE IF NOT EXISTS `final`.`small_group` (
   `location` VARCHAR(45) NOT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `status` ENUM('active', 'paused') NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB;
 
