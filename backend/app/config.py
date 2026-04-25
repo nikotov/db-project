@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Database
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/postgres"
+    database_url: str = "postgresql://app_user:app_password@localhost:5432/app_db"
     
     # FastAPI
     api_title: str = "Backend API"
