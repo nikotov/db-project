@@ -11,6 +11,7 @@ const MOCK_EVENT_SERIES = [
   {
     id: 1,
     title: "Sunday Service",
+    attendanceType: "individual",
     recurrenceType: "weekly",
     recurrenceRule: "Weekly on Sunday",
     time: "10:00 - 11:45",
@@ -23,6 +24,7 @@ const MOCK_EVENT_SERIES = [
   {
     id: 2,
     title: "Youth Bible Study",
+    attendanceType: "individual",
     recurrenceType: "weekly",
     recurrenceRule: "Weekly on Friday",
     time: "19:00 - 20:30",
@@ -35,6 +37,7 @@ const MOCK_EVENT_SERIES = [
   {
     id: 3,
     title: "Leaders Prayer",
+    attendanceType: "general",
     recurrenceType: "weekly",
     recurrenceRule: "Biweekly on Wednesday",
     time: "06:30 - 07:15",
@@ -47,6 +50,7 @@ const MOCK_EVENT_SERIES = [
   {
     id: 4,
     title: "Community Outreach",
+    attendanceType: "general",
     recurrenceType: "monthly",
     recurrenceRule: "Monthly on 2nd Saturday",
     time: "09:00 - 12:00",
@@ -59,6 +63,7 @@ const MOCK_EVENT_SERIES = [
   {
     id: 5,
     title: "New Members Welcome",
+    attendanceType: "general",
     recurrenceType: "none",
     recurrenceRule: "One-time event",
     time: "18:00 - 19:00",
@@ -78,6 +83,7 @@ const DEFAULT_FILTERS = {
 
 const CREATE_INITIAL = {
   title: "",
+  attendanceType: "general",
   recurrenceType: "weekly",
   recurrenceRule: "",
   time: "",
@@ -138,6 +144,7 @@ export default function EventsPage() {
       const matchesSearch =
         !search ||
         item.title.toLowerCase().includes(search) ||
+        item.attendanceType.toLowerCase().includes(search) ||
         item.location.toLowerCase().includes(search) ||
         item.recurrenceRule.toLowerCase().includes(search) ||
         item.recurrenceType.toLowerCase().includes(search) ||
@@ -274,6 +281,7 @@ export default function EventsPage() {
               <h3>{item.title}</h3>
               <p>{item.recurrenceRule || "One-time event"}</p>
               <div className="event-series-badges">
+                <span className="event-series-badge event-series-badge-attendance">{item.attendanceType}</span>
                 <span className="event-series-badge event-series-badge-recurrence">{item.recurrenceType}</span>
                 <span className={`event-series-badge event-series-status-${item.status}`}>{item.status}</span>
               </div>
@@ -392,6 +400,17 @@ export default function EventsPage() {
                   onChange={(event) => setCreateForm((current) => ({ ...current, title: event.target.value }))}
                   required
                 />
+              </label>
+
+              <label>
+                Attendance Type
+                <select
+                  value={createForm.attendanceType}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, attendanceType: event.target.value }))}
+                >
+                  <option value="general">general</option>
+                  <option value="individual">individual</option>
+                </select>
               </label>
 
               <label>
@@ -514,6 +533,10 @@ export default function EventsPage() {
               <p className="events-detail-item" role="listitem">
                 <span>Recurrence Type</span>
                 <strong>{selectedSeries.recurrenceType}</strong>
+              </p>
+              <p className="events-detail-item" role="listitem">
+                <span>Attendance Type</span>
+                <strong>{selectedSeries.attendanceType}</strong>
               </p>
               <p className="events-detail-item" role="listitem">
                 <span>Recurrence Rule</span>

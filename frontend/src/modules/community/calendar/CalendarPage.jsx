@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const SLOT_START_HOUR = 0;
 const SLOT_END_HOUR = 24;
@@ -13,6 +14,7 @@ const MOCK_EVENT_INSTANCES = [
     startMinute: 0,
     durationMinutes: 90,
     seriesName: "Young Adults Small Group",
+    attendanceType: "individual",
     location: "Room 204",
     expected_attendees: 18,
     tags: [
@@ -27,6 +29,7 @@ const MOCK_EVENT_INSTANCES = [
     startMinute: 15,
     durationMinutes: 75,
     seriesName: "Leaders Planning Meeting",
+    attendanceType: "general",
     location: "Conference Room A",
     expected_attendees: 9,
     tags: [{ name: "church", color: "#4f86d9" }],
@@ -38,6 +41,7 @@ const MOCK_EVENT_INSTANCES = [
     startMinute: 30,
     durationMinutes: 120,
     seriesName: "Neighborhood Prayer Night",
+    attendanceType: "general",
     location: "Prayer Hall",
     expected_attendees: 32,
     tags: [{ name: "prayer", color: "#2f9e7a" }],
@@ -49,6 +53,7 @@ const MOCK_EVENT_INSTANCES = [
     startMinute: 0,
     durationMinutes: 90,
     seriesName: "Sunday Service",
+    attendanceType: "individual",
     location: "Main Auditorium",
     expected_attendees: 185,
     tags: [{ name: "church", color: "#4f86d9" }],
@@ -100,6 +105,7 @@ function buildMockWeekEvents(weekStart, instances) {
         series_name: template.seriesName,
         start_datetime: startDatetime.toISOString(),
         end_datetime: endDatetime.toISOString(),
+        attendance_type: template.attendanceType,
         location: template.location,
         attendee_count: template.expected_attendees,
         tags: template.tags,
@@ -143,6 +149,7 @@ function formatDateTime(value) {
 }
 
 export default function CalendarPage() {
+  const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [eventInstances, setEventInstances] = useState(MOCK_EVENT_INSTANCES);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -388,6 +395,10 @@ export default function CalendarPage() {
                 <span>Attendees</span>
                 <strong>{selectedEvent.attendee_count ?? "-"}</strong>
               </p>
+              <p className="calendar-detail-item" role="listitem">
+                <span>Attendance Type</span>
+                <strong>{selectedEvent.attendance_type ?? "general"}</strong>
+              </p>
               <div className="calendar-detail-item" role="listitem">
                 <span>Tags</span>
                 <div className="event-series-tag-list">
@@ -405,6 +416,16 @@ export default function CalendarPage() {
             </div>
 
             <div className="detail-modal-actions">
+              <button
+                type="button"
+                className="members-secondary-button"
+                onClick={() => {
+                  navigate(`/community/attendance?instanceId=${selectedEvent.id}`);
+                  setSelectedEvent(null);
+                }}
+              >
+                Register Attendance
+              </button>
               <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedEvent}>
                 Remove Instance
               </button>

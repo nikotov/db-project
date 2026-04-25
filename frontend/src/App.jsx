@@ -9,6 +9,7 @@ import MembersPage from "./modules/community/members/MembersPage";
 import CalendarPage from "./modules/community/calendar/CalendarPage";
 import EventsPage from "./modules/community/events/EventsPage";
 import SmallGroupsPage from "./modules/community/small-groups/SmallGroupsPage";
+import AttendancePage from "./modules/community/attendance/AttendancePage";
 
 const USER_STORAGE_KEY = "db-project-user";
 const INITIAL_DASHBOARD_METRICS = {
@@ -172,6 +173,7 @@ export default function App() {
           />
           <Route path="members" element={<MembersPage />} />
           <Route path="calendar" element={<CalendarPage />} />
+          <Route path="attendance" element={<AttendancePage />} />
           <Route path="events" element={<EventsPage />} />
           <Route path="small-groups" element={<SmallGroupsPage />} />
         </Route>
