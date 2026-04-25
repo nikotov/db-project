@@ -2,33 +2,67 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.adapters.input.http.deps import get_current_user
 from app.adapters.input.http.schemas.member import (
-    MemberCountResponse,
     MemberCreateRequest,
     MemberResponse,
+)
+from app.adapters.output.persistence.models import (
+    EventInstance,
+    Family,
+    Member as MemberModel,
+    SmallGroup,
+    SmallGroupStatusEnum,
 )
 from app.adapters.output.persistence.sqlalchemy_member_repository import SQLAlchemyMemberRepository
 from app.database import get_db
 from app.domain.entities.member import Member
 from app.domain.services.member_service import MemberNotFoundException, MemberService
+from pydantic import BaseModel
 
 router = APIRouter()
 
 
+class DashboardMetrics(BaseModel):
+    #Full metrics payload consumed by the dashboard page
+    membersCount: int
+    familiesCount: int
+    smallGroupsCount: int
+    upcomingEventsCount: int
+    lastSundayServiceAttendance: int = 0
+    lastWeekSmallGroupAttendance: int = 0
+    income: str = "$0"
+
+
 def get_member_service(db: Session = Depends(get_db)) -> MemberService:
-    """Resolve member service dependency."""
     return MemberService(member_repo=SQLAlchemyMemberRepository(db))
 
 
-@router.get("/members/count", response_model=MemberCountResponse)
+@router.get("/members/count", response_model=DashboardMetrics)
 def count_members(
-    member_service: MemberService = Depends(get_member_service),
-) -> MemberCountResponse:
-    """Return current number of members."""
-    total = member_service.count_members()
-    return MemberCountResponse(total=total)
+    db: Session = Depends(get_db),
+    _: str = Depends(get_current_user),
+) -> DashboardMetrics:
+    #Return dashboard metrics: members, families, small groups, upcoming events
+    members_count = int(db.execute(select(func.count()).select_from(MemberModel)).scalar_one())
+    families_count = int(db.execute(select(func.count()).select_from(Family)).scalar_one())
+    small_groups_count = int(db.execute(
+        select(func.count()).select_from(SmallGroup).where(SmallGroup.status == SmallGroupStatusEnum.active)
+    ).scalar_one())
+    now = datetime.now(timezone.utc)
+    upcoming_count = int(db.execute(
+        select(func.count()).select_from(EventInstance).where(EventInstance.start_datetime > now)
+    ).scalar_one())
+
+    return DashboardMetrics(
+        membersCount=members_count,
+        familiesCount=families_count,
+        smallGroupsCount=small_groups_count,
+        upcomingEventsCount=upcoming_count,
+    )
 
 
 @router.get("/members", response_model=list[MemberResponse])
@@ -36,30 +70,31 @@ def list_members(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     member_service: MemberService = Depends(get_member_service),
+    _: str = Depends(get_current_user),
 ) -> list[MemberResponse]:
-    """List members with basic pagination."""
     members = member_service.list_members(limit=limit, offset=offset)
-    return [MemberResponse.model_validate(member) for member in members]
+    return [MemberResponse.model_validate(m) for m in members]
 
 
 @router.get("/members/{member_id}", response_model=MemberResponse)
 def get_member(
     member_id: int,
     member_service: MemberService = Depends(get_member_service),
+    _: str = Depends(get_current_user),
 ) -> MemberResponse:
-    """Return one member by ID."""
     try:
         member = member_service.get_member(member_id)
         return MemberResponse.model_validate(member)
     except MemberNotFoundException as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    
+
+
 @router.post("/members", response_model=MemberResponse, status_code=status.HTTP_201_CREATED)
 def create_member(
     payload: MemberCreateRequest,
     member_service: MemberService = Depends(get_member_service),
+    _: str = Depends(get_current_user),
 ) -> MemberResponse:
-    """Create a new member."""
     try:
         now = datetime.now(timezone.utc)
         member = Member(
@@ -85,17 +120,17 @@ def create_member(
         member_id = member_service.create_member(member)
         created = member_service.get_member(member_id)
         return MemberResponse.model_validate(created)
-
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    
+
+
 @router.put("/members/{member_id}", response_model=MemberResponse)
 def update_member(
     member_id: int,
     payload: MemberCreateRequest,
     member_service: MemberService = Depends(get_member_service),
+    _: str = Depends(get_current_user),
 ) -> MemberResponse:
-    """Update an existing member."""
     try:
         existing = member_service.get_member(member_id)
         now = datetime.now(timezone.utc)
@@ -126,13 +161,14 @@ def update_member(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    
+
+
 @router.delete("/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_member(
     member_id: int,
     member_service: MemberService = Depends(get_member_service),
+    _: str = Depends(get_current_user),
 ) -> None:
-    """Delete a member by ID."""
     try:
         member_service.delete_member(member_id)
     except MemberNotFoundException as exc:
