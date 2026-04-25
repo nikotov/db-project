@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resets the local PostgreSQL container and volume for a clean state.
+# Resets local PostgreSQL state and reapplies schema through Alembic.
 docker compose down -v
 docker compose up -d
 
-echo "Local PostgreSQL reset completed."
+echo "PostgreSQL reset completed."
+echo "Apply schema migrations with Alembic from backend/:"
+echo "  alembic upgrade head"

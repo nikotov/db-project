@@ -61,6 +61,29 @@ Notes:
 
 - `alembic/env.py` uses `DATABASE_URL` from your `.env` through app settings.
 - Keep SQLAlchemy models under `app/adapters/output/persistence/` and import them in `alembic/env.py` so autogenerate can detect changes.
+- Alembic is the single schema migration path for this project.
+- The baseline schema is tracked by revision `0001_initial_schema` in `alembic/versions/0001_initial_schema.py`.
+- Seed data is optional and should be applied separately from schema migrations.
+
+### Local DB Bootstrap Flow
+
+From project root:
+
+```bash
+docker compose up -d
+```
+
+Then from `backend/`:
+
+```bash
+alembic upgrade head
+```
+
+Optional seed load (from project root):
+
+```bash
+cat db/seeds/001_seed_dev.sql | docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+```
 
 ## Getting Started
 

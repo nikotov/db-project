@@ -6,8 +6,8 @@ Starter structure for a class final project using PostgreSQL.
 
 - `backend/`: Backend application code.
 - `frontend/`: Frontend application code.
-- `db/init/`: SQL scripts automatically executed on first PostgreSQL container start.
-- `db/migrations/`: Versioned schema changes (`0001_...sql`, `0002_...sql`, etc.).
+- `db/init/`: Minimal SQL bootstrap scripts (extensions only) executed on first PostgreSQL container start.
+- `db/migrations/`: Legacy SQL migration snapshots (reference-only; not executed by Docker).
 - `db/seeds/`: Development/test seed data.
 - `db/scripts/`: Helper scripts for local DB workflows.
 - `schema_final.sql`: Original DER export file (MySQL Workbench format).
@@ -20,7 +20,7 @@ Backend note:
 ## DER to PostgreSQL note
 
 The file `schema_final.sql` uses MySQL syntax from Workbench.
-The PostgreSQL-ready baseline is in `db/migrations/0001_initial_schema.sql`.
+The active PostgreSQL schema migration path is Alembic in `backend/alembic/versions/`.
 
 ## Quick start
 
@@ -28,20 +28,21 @@ The PostgreSQL-ready baseline is in `db/migrations/0001_initial_schema.sql`.
    - `cp .env.example .env`
 2. Start PostgreSQL:
    - `docker compose up -d`
-3. Check logs:
+3. Apply DB schema migrations:
+   - `cd backend && alembic upgrade head`
+4. Check logs:
    - `docker compose logs -f postgres`
 
 Note:
-- On first startup (empty volume), Docker will automatically run:
-   - `db/init/001_bootstrap.sql`
-   - `db/migrations/0001_initial_schema.sql`
-   - `db/seeds/001_seed_dev.sql`
-- If you need to re-run init scripts, reset the volume:
+- On first startup (empty volume), Docker will only run minimal bootstrap scripts in `db/init/`.
+- Schema changes are applied through Alembic only.
+- If you need to reinitialize local DB state:
    - `docker compose down -v && docker compose up -d`
+   - `cd backend && alembic upgrade head`
 
 ## Suggested first milestones
 
-1. Write initial schema in `db/migrations/0001_initial_schema.sql`.
+1. Create schema revisions in `backend/alembic/versions/`.
 2. Add seed data in `db/seeds/001_seed_dev.sql`.
 3. Implement backend use cases in `backend/app/domain/` and adapters in `backend/app/adapters/`.
-4. Create DB migrations in `backend/alembic/versions/` and apply with Alembic.
+4. Apply DB migrations with Alembic.
