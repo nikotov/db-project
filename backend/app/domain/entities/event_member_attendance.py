@@ -8,5 +8,5 @@ from app.domain.enums.registration_status import RegistrationStatus
 class EventMemberAttendance:
     event_instance_id: int
     member_id: int
-    registered_status: RegistrationStatus
+    registration_status: RegistrationStatus
     attendance_status: MemberAttendanceStatus

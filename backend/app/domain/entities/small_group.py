@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Optional
 
-from app.domain.enums import DayOfWeek
+from app.domain.enums import DayOfWeek, SmallGroupStatus
 
 
 @dataclass
@@ -15,3 +15,4 @@ class SmallGroup:
     location: Optional[str]
     created_at: datetime
     updated_at: Optional[datetime]
+    status: SmallGroupStatus

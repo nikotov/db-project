@@ -74,6 +74,9 @@ class EventSeriesStatusEnum(enum.Enum):
     cancelled = "cancelled"
     completed = "completed"
 
+class SmallGroupStatusEnum(enum.Enum):
+    active = "active"
+    paused = "paused"
 
 class EventSeries(Base):
     __tablename__ = "event_series"
@@ -191,7 +194,11 @@ class SmallGroup(Base):
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
-
+    status: Mapped[SmallGroupStatusEnum] = mapped_column(
+        Enum(SmallGroupStatusEnum),
+        nullable=False,
+        default=SmallGroupStatusEnum.active,
+    )
     memberships: Mapped[list["GroupMembership"]] = relationship(back_populates="small_group", lazy="selectin")
     tags: Mapped[list["SmallGroupTagMap"]] = relationship(back_populates="small_group", lazy="selectin")
 
@@ -202,7 +209,6 @@ class SmallGroupTag(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(45), nullable=False, unique=True)
     color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
-
     group_tags: Mapped[list["SmallGroupTagMap"]] = relationship(back_populates="tag", lazy="selectin")
 
 
