@@ -78,17 +78,38 @@ class SmallGroupStatusEnum(enum.Enum):
     active = "active"
     paused = "paused"
 
+EVENT_ATTENDANCE_TYPE_ENUM = Enum(EventAttendanceTypeEnum, name="event_attendance_type_enum")
+MEMBER_ATTENDANCE_STATUS_ENUM = Enum(
+    MemberAttendanceStatusEnum, name="member_attendance_status_enum"
+)
+MEMBER_REGISTRATION_STATUS_ENUM = Enum(
+    MemberRegistrationStatusEnum, name="member_registration_status_enum"
+)
+DAY_OF_WEEK_ENUM = Enum(DayOfWeekEnum, name="day_of_week_enum")
+GROUP_MEMBERSHIP_STATUS_ENUM = Enum(
+    GroupMembershipStatusEnum, name="group_membership_status_enum"
+)
+GENDER_ENUM = Enum(GenderEnum, name="gender_enum")
+MARITAL_STATUS_ENUM = Enum(MaritalStatusEnum, name="marital_status_enum")
+RECURRENCE_TYPE_ENUM = Enum(RecurrenceTypeEnum, name="recurrence_type_enum")
+EVENT_SERIES_STATUS_ENUM = Enum(EventSeriesStatusEnum, name="event_series_status_enum")
+SMALL_GROUP_STATUS_ENUM = Enum(SmallGroupStatusEnum, name="small_group_status_enum")
+
 class EventSeries(Base):
     __tablename__ = "event_series"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(45), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    attendance_type: Mapped[EventAttendanceTypeEnum] = mapped_column(Enum(EventAttendanceTypeEnum), nullable=False)
-    recurrence_type: Mapped[RecurrenceTypeEnum] = mapped_column(Enum(RecurrenceTypeEnum), nullable=False, default=RecurrenceTypeEnum.none)
+    attendance_type: Mapped[EventAttendanceTypeEnum] = mapped_column(
+        EVENT_ATTENDANCE_TYPE_ENUM, nullable=False
+    )
+    recurrence_type: Mapped[RecurrenceTypeEnum] = mapped_column(
+        RECURRENCE_TYPE_ENUM, nullable=False, default=RecurrenceTypeEnum.none
+    )
     recurrence_rule: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[EventSeriesStatusEnum] = mapped_column(
-        Enum(EventSeriesStatusEnum),
+        EVENT_SERIES_STATUS_ENUM,
         nullable=False,
         default=EventSeriesStatusEnum.active,
     )
@@ -168,13 +189,13 @@ class EventMemberAttendance(Base):
     member_id: Mapped[int] = mapped_column(Integer, ForeignKey("member.id"), nullable=False, primary_key=True)
     
     registration_status: Mapped[MemberRegistrationStatusEnum] = mapped_column(
-        Enum(MemberRegistrationStatusEnum),
+        MEMBER_REGISTRATION_STATUS_ENUM,
         nullable=False,
         default=MemberRegistrationStatusEnum.registered,
     )
 
     attendance_status: Mapped[MemberAttendanceStatusEnum] = mapped_column(
-        Enum(MemberAttendanceStatusEnum),
+        MEMBER_ATTENDANCE_STATUS_ENUM,
         nullable=False,
         default=MemberAttendanceStatusEnum.pending,
     )
@@ -189,13 +210,13 @@ class SmallGroup(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(45), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    meeting_day: Mapped[DayOfWeekEnum] = mapped_column(Enum(DayOfWeekEnum), nullable=False)
+    meeting_day: Mapped[DayOfWeekEnum] = mapped_column(DAY_OF_WEEK_ENUM, nullable=False)
     meeting_time: Mapped[time] = mapped_column(Time, nullable=False)
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
     status: Mapped[SmallGroupStatusEnum] = mapped_column(
-        Enum(SmallGroupStatusEnum),
+        SMALL_GROUP_STATUS_ENUM,
         nullable=False,
         default=SmallGroupStatusEnum.active,
     )
@@ -231,7 +252,7 @@ class GroupMembership(Base):
     member_id: Mapped[int] = mapped_column(Integer, ForeignKey("member.id"), nullable=False)
     small_group_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group.id"), nullable=False)
     role: Mapped[GroupMembershipStatusEnum] = mapped_column(
-        Enum(GroupMembershipStatusEnum),
+        GROUP_MEMBERSHIP_STATUS_ENUM,
         nullable=False,
         default=GroupMembershipStatusEnum.unknown,
     )
@@ -252,14 +273,16 @@ class Member(Base):
     last_name_maternal: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     birth_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    gender: Mapped[GenderEnum] = mapped_column(Enum(GenderEnum), nullable=False)
+    gender: Mapped[GenderEnum] = mapped_column(GENDER_ENUM, nullable=False)
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(100), unique=True, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
 
-    marital_status: Mapped[Optional[MaritalStatusEnum]] = mapped_column(Enum(MaritalStatusEnum), nullable=True)
+    marital_status: Mapped[Optional[MaritalStatusEnum]] = mapped_column(
+        MARITAL_STATUS_ENUM, nullable=True
+    )
     family_role: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
 
     is_baptized: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
