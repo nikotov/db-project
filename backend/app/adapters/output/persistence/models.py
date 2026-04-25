@@ -17,10 +17,17 @@ class EventAttendanceTypeEnum(enum.Enum):
 
 
 class MemberAttendanceStatusEnum(enum.Enum):
+    pending = "pending"
     attended = "attended"
     absent = "absent"
     late = "late"
     excused = "excused"
+    unknown = "unknown"
+
+class MemberRegistrationStatusEnum(enum.Enum):
+    registered = "registered"
+    cancelled = "cancelled"
+    waitlisted = "waitlisted"
     unknown = "unknown"
 
 
@@ -97,6 +104,7 @@ class EventInstance(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    attendance_notes: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     start_datetime: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     end_datetime: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     attendee_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -155,10 +163,17 @@ class EventMemberAttendance(Base):
 
     event_instance_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_instance.id"), nullable=False, primary_key=True)
     member_id: Mapped[int] = mapped_column(Integer, ForeignKey("member.id"), nullable=False, primary_key=True)
-    status: Mapped[MemberAttendanceStatusEnum] = mapped_column(
+    
+    registration_status: Mapped[MemberRegistrationStatusEnum] = mapped_column(
+        Enum(MemberRegistrationStatusEnum),
+        nullable=False,
+        default=MemberRegistrationStatusEnum.registered,
+    )
+
+    attendance_status: Mapped[MemberAttendanceStatusEnum] = mapped_column(
         Enum(MemberAttendanceStatusEnum),
         nullable=False,
-        default=MemberAttendanceStatusEnum.unknown,
+        default=MemberAttendanceStatusEnum.pending,
     )
 
     event_instance: Mapped["EventInstance"] = relationship(back_populates="member_attendance", lazy="joined")

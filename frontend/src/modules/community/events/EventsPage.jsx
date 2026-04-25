@@ -7,6 +7,15 @@ const MOCK_EVENT_TAGS = [
   { id: 4, name: "outreach", color: "#e08a2e" },
 ];
 
+const MOCK_MEMBERS = [
+  { id: 1, name: "Daniel Gomez", family: "Gomez Family" },
+  { id: 2, name: "Mariana Lopez", family: "Lopez Family" },
+  { id: 3, name: "Samuel Ortiz", family: "Ortiz Family" },
+  { id: 4, name: "Elena Vega", family: "Vega Family" },
+  { id: 5, name: "Camila Rivera", family: "Rivera Family" },
+  { id: 6, name: "Jorge Mendez", family: "Mendez Family" },
+];
+
 const MOCK_EVENT_SERIES = [
   {
     id: 1,
@@ -20,6 +29,7 @@ const MOCK_EVENT_SERIES = [
     category: "service",
     nextOccurrence: "2026-04-26",
     tagIds: [1],
+    registeredMemberIds: [1, 2, 4],
   },
   {
     id: 2,
@@ -33,6 +43,7 @@ const MOCK_EVENT_SERIES = [
     category: "study",
     nextOccurrence: "2026-04-24",
     tagIds: [1, 2],
+    registeredMemberIds: [1, 3, 5],
   },
   {
     id: 3,
@@ -46,6 +57,7 @@ const MOCK_EVENT_SERIES = [
     category: "prayer",
     nextOccurrence: "2026-04-29",
     tagIds: [3],
+    registeredMemberIds: [2, 4],
   },
   {
     id: 4,
@@ -59,6 +71,7 @@ const MOCK_EVENT_SERIES = [
     category: "outreach",
     nextOccurrence: "2026-05-09",
     tagIds: [4],
+    registeredMemberIds: [1, 2, 3, 4],
   },
   {
     id: 5,
@@ -72,6 +85,7 @@ const MOCK_EVENT_SERIES = [
     category: "service",
     nextOccurrence: "2026-05-12",
     tagIds: [1],
+    registeredMemberIds: [5, 6],
   },
 ];
 
@@ -79,6 +93,7 @@ const DEFAULT_FILTERS = {
   search: "",
   status: "all",
   recurrenceType: "all",
+  tagIds: [],
 };
 
 const CREATE_INITIAL = {
@@ -118,15 +133,32 @@ function formatDate(dateText) {
 export default function EventsPage() {
   const [series, setSeries] = useState(MOCK_EVENT_SERIES);
   const [tags, setTags] = useState(MOCK_EVENT_TAGS);
-  const [selectedSeries, setSelectedSeries] = useState(null);
+  const [selectedSeriesId, setSelectedSeriesId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [createForm, setCreateForm] = useState(CREATE_INITIAL);
   const [tagForm, setTagForm] = useState(TAG_INITIAL);
 
   const tagsById = useMemo(() => Object.fromEntries(tags.map((tag) => [tag.id, tag])), [tags]);
+
+  const selectedSeries = useMemo(
+    () => series.find((item) => item.id === selectedSeriesId) ?? null,
+    [series, selectedSeriesId]
+  );
+
+  const selectedSeriesRegisteredMemberIds = selectedSeries?.registeredMemberIds ?? [];
+
+  const filteredMembers = useMemo(() => {
+    const search = memberSearch.trim().toLowerCase();
+
+    return MOCK_MEMBERS.filter((member) => {
+      const searchable = `${member.name} ${member.family}`.toLowerCase();
+      return !search || searchable.includes(search);
+    });
+  }, [memberSearch]);
 
   const filterOptions = useMemo(
     () => ({
@@ -152,8 +184,10 @@ export default function EventsPage() {
       const matchesStatus = filters.status === "all" || item.status === filters.status;
       const matchesRecurrenceType =
         filters.recurrenceType === "all" || item.recurrenceType === filters.recurrenceType;
+      const matchesTag =
+        !filters.tagIds.length || filters.tagIds.every((selectedTagId) => item.tagIds.includes(selectedTagId));
 
-      return matchesSearch && matchesStatus && matchesRecurrenceType;
+      return matchesSearch && matchesStatus && matchesRecurrenceType && matchesTag;
     });
   }, [filters, series, tagsById]);
 
@@ -168,6 +202,7 @@ export default function EventsPage() {
       time: createForm.time.trim(),
       recurrenceRule: createForm.recurrenceRule.trim(),
       nextOccurrence: createForm.recurrenceType === "none" ? createForm.nextOccurrence : "",
+      registeredMemberIds: [],
     };
 
     setSeries((current) => [newSeries, ...current]);
@@ -238,7 +273,32 @@ export default function EventsPage() {
     }
 
     setSeries((current) => current.filter((item) => item.id !== selectedSeries.id));
-    setSelectedSeries(null);
+    setSelectedSeriesId(null);
+    setMemberSearch("");
+  };
+
+  const handleToggleMemberRegistration = (memberId) => {
+    if (!selectedSeries) {
+      return;
+    }
+
+    setSeries((current) =>
+      current.map((item) => {
+        if (item.id !== selectedSeries.id) {
+          return item;
+        }
+
+        const registeredMemberIds = item.registeredMemberIds ?? [];
+        const isRegistered = registeredMemberIds.includes(memberId);
+
+        return {
+          ...item,
+          registeredMemberIds: isRegistered
+            ? registeredMemberIds.filter((value) => value !== memberId)
+            : [...registeredMemberIds, memberId],
+        };
+      })
+    );
   };
 
   return (
@@ -268,11 +328,15 @@ export default function EventsPage() {
             className="event-series-row"
             role="listitem"
             tabIndex={0}
-            onClick={() => setSelectedSeries(item)}
+            onClick={() => {
+              setSelectedSeriesId(item.id);
+              setMemberSearch("");
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                setSelectedSeries(item);
+                setSelectedSeriesId(item.id);
+                setMemberSearch("");
               }
             }}
             aria-label={`Open details for ${item.title}`}
@@ -333,8 +397,8 @@ export default function EventsPage() {
           <aside className="members-drawer members-filter-drawer" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
               <h3>Series Filters</h3>
-              <button type="button" className="members-text-button" onClick={() => setFilters(DEFAULT_FILTERS)}>
-                Clear
+              <button type="button" className="members-text-button" onClick={() => setFiltersOpen(false)}>
+                Close
               </button>
             </div>
 
@@ -377,6 +441,49 @@ export default function EventsPage() {
                   ))}
                 </select>
               </label>
+
+              <fieldset className="events-tag-picker">
+                <legend>Tag</legend>
+                <div className="events-tag-picker-list">
+                  <button
+                    type="button"
+                    className={`events-tag-picker-item ${!filters.tagIds.length ? "events-tag-picker-item-selected" : ""}`}
+                    onClick={() => setFilters((current) => ({ ...current, tagIds: [] }))}
+                  >
+                    All tags
+                  </button>
+                  {tags.map((tag) => {
+                    const selected = filters.tagIds.includes(tag.id);
+
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        className={`events-tag-picker-item ${selected ? "events-tag-picker-item-selected" : ""}`}
+                        onClick={() =>
+                          setFilters((current) => {
+                            const isSelected = current.tagIds.includes(tag.id);
+                            return {
+                              ...current,
+                              tagIds: isSelected
+                                ? current.tagIds.filter((value) => value !== tag.id)
+                                : [...current.tagIds, tag.id],
+                            };
+                          })
+                        }
+                        style={{ borderColor: tag.color }}
+                      >
+                        <span className="events-tag-picker-dot" style={{ background: tag.color }} />
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <button type="button" className="members-secondary-button" onClick={() => setFilters(DEFAULT_FILTERS)}>
+                Clear Filters
+              </button>
             </div>
           </aside>
         </div>
@@ -512,11 +619,25 @@ export default function EventsPage() {
       ) : null}
 
       {selectedSeries ? (
-        <div className="members-drawer-backdrop events-modal-backdrop" onClick={() => setSelectedSeries(null)} role="presentation">
+        <div
+          className="members-drawer-backdrop events-modal-backdrop"
+          onClick={() => {
+            setSelectedSeriesId(null);
+            setMemberSearch("");
+          }}
+          role="presentation"
+        >
           <aside className="events-modal-card events-detail-modal" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
               <h3>{selectedSeries.title}</h3>
-              <button type="button" className="members-text-button" onClick={() => setSelectedSeries(null)}>
+              <button
+                type="button"
+                className="members-text-button"
+                onClick={() => {
+                  setSelectedSeriesId(null);
+                  setMemberSearch("");
+                }}
+              >
                 Close
               </button>
             </div>
@@ -577,6 +698,59 @@ export default function EventsPage() {
               </div>
             </div>
 
+            {selectedSeries.attendanceType === "individual" ? (
+              <div className="events-register-panel">
+                <div className="events-register-panel-head">
+                  <div>
+                    <h3>Register Members</h3>
+                  </div>
+
+                  <p className="events-register-count">{selectedSeriesRegisteredMemberIds.length} registered</p>
+                </div>
+
+                <label className="events-register-search">
+                  Search members
+                  <input
+                    value={memberSearch}
+                    onChange={(event) => setMemberSearch(event.target.value)}
+                    placeholder="Name or family"
+                  />
+                </label>
+
+                <div className="events-register-list" role="list" aria-label="Member registration list">
+                  {filteredMembers.length ? (
+                    filteredMembers.map((member) => {
+                      const isRegistered = selectedSeriesRegisteredMemberIds.includes(member.id);
+
+                      return (
+                        <div key={member.id} className="events-register-row" role="listitem">
+                          <div className="events-register-row-main">
+                            <strong>{member.name}</strong>
+                            <span>{member.family}</span>
+                          </div>
+
+                          <div className="events-register-row-actions">
+                            <span className={`events-register-pill ${isRegistered ? "events-register-pill-active" : ""}`}>
+                              {isRegistered ? "Registered" : "Not registered"}
+                            </span>
+                            <button
+                              type="button"
+                              className={isRegistered ? "events-tag-remove-button" : "members-secondary-button"}
+                              onClick={() => handleToggleMemberRegistration(member.id)}
+                            >
+                              {isRegistered ? "Unregister" : "Register"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="events-register-empty">No members match your search.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
             <div className="detail-modal-actions">
               <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedSeries}>
                 Remove Series
@@ -599,8 +773,7 @@ export default function EventsPage() {
             <div className="events-tag-panel">
               <div className="events-tag-panel-head">
                 <div>
-                  <h3>Tags</h3>
-                  <p>Define user tags once and reuse them across event series.</p>
+                  <h3>Create Tags</h3>
                 </div>
 
                 <p className="events-tag-count">{tags.length} available</p>

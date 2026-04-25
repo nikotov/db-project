@@ -621,12 +621,11 @@ button:disabled {
 }
 
 .events-tag-panel {
-  border: 1px solid #2d4064;
-  border-radius: 18px;
-  background: linear-gradient(145deg, #111f3a, #0d1830);
-  padding: 1rem;
+  border-top: 1px solid rgba(84, 111, 160, 0.32);
+  margin-top: 0.7rem;
+  padding-top: 1.25rem;
   display: grid;
-  gap: 0.85rem;
+  gap: 1rem;
 }
 
 .events-tag-panel-head {
@@ -680,6 +679,12 @@ button:disabled {
   font-size: 0.95rem;
 }
 
+.events-tag-remove-section {
+  border-top: 1px solid rgba(84, 111, 160, 0.32);
+  margin-top: 0.45rem;
+  padding-top: 1rem;
+}
+
 .events-tag-remove-list {
   margin-top: 0.55rem;
   display: grid;
@@ -705,6 +710,106 @@ button:disabled {
   padding: 0.42rem 0.7rem;
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.events-register-panel {
+  border-top: 1px solid rgba(84, 111, 160, 0.32);
+  margin-top: 0.7rem;
+  padding-top: 1.25rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.events-register-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.events-register-panel-head h4 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.events-register-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: right;
+}
+
+.events-register-search input {
+  margin-top: 0.25rem;
+  width: 100%;
+  border: 1px solid #334567;
+  background: #0a1224;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.94rem;
+}
+
+.events-register-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.events-register-row {
+  border: 1px solid #334567;
+  border-radius: 10px;
+  background: rgba(7, 13, 28, 0.28);
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.events-register-row-main {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.events-register-row-main strong {
+  font-size: 0.9rem;
+}
+
+.events-register-row-main span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.events-register-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.events-register-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #456da7;
+  border-radius: 999px;
+  padding: 0.16rem 0.5rem;
+  background: rgba(31, 70, 129, 0.16);
+  color: #d2e5ff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.events-register-pill-active {
+  border-color: #2f7a54;
+  background: rgba(39, 124, 80, 0.25);
+  color: #cdeedd;
+}
+
+.events-register-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .events-tag-pill {
@@ -1084,8 +1189,8 @@ button:disabled {
 }
 
 .detail-modal-actions {
-  margin-top: 0.9rem;
-  padding-top: 0.9rem;
+  margin-top: 1.2rem;
+  padding-top: 1.15rem;
   border-top: 1px solid rgba(84, 111, 160, 0.32);
   display: flex;
   justify-content: flex-end;
@@ -1443,6 +1548,16 @@ button:disabled {
 
   .events-tag-form button {
     grid-column: 1 / -1;
+  }
+
+  .events-register-row,
+  .events-register-panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .events-register-row-actions {
+    justify-content: flex-start;
   }
 
   .attendance-groups-grid {
