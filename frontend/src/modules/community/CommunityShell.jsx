@@ -1,9 +1,6 @@
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+
 import { COMMUNITY_SIDEBAR_ITEMS } from "./sidebarItems";
-import DashboardPage from "./dashboard/DashboardPage";
-import MembersPage from "./members/MembersPage";
-import CalendarPage from "./calendar/CalendarPage";
-import EventsPage from "./events/EventsPage";
-import SmallGroupsPage from "./small-groups/SmallGroupsPage";
 
 function MenuIcon() {
   return (
@@ -19,23 +16,40 @@ function MenuIcon() {
   );
 }
 
-function Sidebar({ activePage, isOpen, onSelectPage }) {
+function Sidebar({ isOpen, onToggleSidebar }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   return (
     <aside className={`sidebar ${isOpen ? "sidebar-open" : "sidebar-closed"}`}>
-      <div className="sidebar-brand">
-        <h2>Community</h2>
+      <div className="sidebar-topbar">
+        <div className="sidebar-brand">
+          <h2>Community</h2>
+        </div>
+        <button
+          type="button"
+          className="toggle-button sidebar-toggle"
+          aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
+          onClick={onToggleSidebar}
+        >
+          <MenuIcon />
+        </button>
       </div>
       <nav className="sidebar-nav" aria-label="Community navigation">
         {COMMUNITY_SIDEBAR_ITEMS.map((item) => {
-          const isActive = activePage === item.key;
+          const isActive = location.pathname === item.path;
           return (
             <button
               key={item.key}
               type="button"
               className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
-              onClick={() => onSelectPage(item.key)}
+              aria-label={item.label}
+              onClick={() => navigate(item.path)}
             >
-              {item.label}
+              <span className="sidebar-link-icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span className="sidebar-link-label">{item.label}</span>
             </button>
           );
         })}
@@ -44,46 +58,26 @@ function Sidebar({ activePage, isOpen, onSelectPage }) {
   );
 }
 
-function resolvePage(activePage, dashboardLoading, metrics) {
-  switch (activePage) {
-    case "dashboard":
-      return <DashboardPage dashboardLoading={dashboardLoading} metrics={metrics} />;
-    case "members":
-      return <MembersPage />;
-    case "calendar":
-      return <CalendarPage />;
-    case "events":
-      return <EventsPage />;
-    case "small-groups":
-      return <SmallGroupsPage />;
-    default:
-      return null;
-  }
-}
-
 export default function CommunityShell({
   user,
-  activePage,
   isSidebarOpen,
   onToggleSidebar,
-  onSelectPage,
   onLogout,
-  dashboardLoading,
-  metrics,
 }) {
+  const location = useLocation();
   const activeLabel =
-    COMMUNITY_SIDEBAR_ITEMS.find((item) => item.key === activePage)?.label ?? "Dashboard";
+    COMMUNITY_SIDEBAR_ITEMS.find((item) => item.path === location.pathname)?.label ?? "Dashboard";
 
   return (
     <section className={`workspace-shell ${isSidebarOpen ? "workspace-shell-open" : "workspace-shell-closed"}`}>
-      <Sidebar activePage={activePage} isOpen={isSidebarOpen} onSelectPage={onSelectPage} />
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onToggleSidebar={onToggleSidebar}
+      />
 
       <div className="workspace-main">
         <header className="workspace-header">
           <div className="workspace-header-left">
-            <button type="button" className="toggle-button" onClick={onToggleSidebar}>
-              <MenuIcon />
-            </button>
             <h1>{activeLabel}</h1>
           </div>
 
@@ -97,7 +91,7 @@ export default function CommunityShell({
           </div>
         </header>
 
-        {resolvePage(activePage, dashboardLoading, metrics)}
+        <Outlet />
       </div>
     </section>
   );

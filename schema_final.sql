@@ -83,6 +83,9 @@ CREATE TABLE IF NOT EXISTS `final`.`event_series` (
   `attendance_type` ENUM('individual', 'general') NOT NULL,
   `is_recurring` TINYINT NOT NULL,
   `recurrence_rule` TEXT NULL,
+  `start_datetime` DATETIME NOT NULL,
+  `end_datetime` VARCHAR(45) NOT NULL,
+  `location` VARCHAR(45) NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`))
@@ -96,6 +99,7 @@ CREATE TABLE IF NOT EXISTS `final`.`event_instance` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `start_datetime` DATETIME NOT NULL,
   `end_datetime` DATETIME NOT NULL,
+  `location` VARCHAR(45) NULL,
   `event_series_id` INT NOT NULL,
   `attendee_count` INT NULL,
   PRIMARY KEY (`id`),

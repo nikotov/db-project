@@ -91,32 +91,37 @@ function MetricCard({ icon, title, value, note, emphasis = "normal" }) {
 export default function DashboardPage({ dashboardLoading, metrics }) {
   return (
     <section className="dashboard-layout">
-      <article className="primary-dashboard-card">
-        <div className="metric-head primary-head">
-          <span className="metric-badge metric-badge-large" aria-hidden="true">
-            <ChurchIcon />
-          </span>
-          <div>
-            <h2>Primary Dashboard</h2>
-            <p className="metric-note">High-level view of the community</p>
-          </div>
-        </div>
-
-        <div className="primary-dashboard-content">
-          <div className="primary-metric-block">
+      <div className="primary-dashboard-content">
+        <article className="primary-metric-block">
+          <div className="metric-head">
+            <span className="metric-badge" aria-hidden="true">
+              <UsersIcon />
+            </span>
             <span className="primary-label">Last Sunday Service Attendance</span>
-            <p className="primary-value">{dashboardLoading ? "..." : metrics.lastSundayServiceAttendance}</p>
           </div>
-          <div className="primary-metric-block">
+          <p className="primary-value">{dashboardLoading ? "..." : metrics.lastSundayServiceAttendance}</p>
+        </article>
+        <article className="primary-metric-block">
+          <div className="metric-head">
+            <span className="metric-badge" aria-hidden="true">
+              <GroupIcon />
+            </span>
             <span className="primary-label">Last Week Small Group Attendance</span>
-            <p className="primary-value">{dashboardLoading ? "..." : metrics.lastWeekSmallGroupAttendance}</p>
           </div>
-          <div className="primary-metric-block">
+          <p className="primary-value">{dashboardLoading ? "..." : metrics.lastWeekSmallGroupAttendance}</p>
+        </article>
+        <article className="primary-metric-block">
+          <div className="metric-head">
+            <span className="metric-badge" aria-hidden="true">
+              <MoneyIcon />
+            </span>
             <span className="primary-label">Income</span>
-            <p className="primary-value">{dashboardLoading ? "..." : metrics.income}</p>
           </div>
-        </div>
-      </article>
+          <p className="primary-value">{dashboardLoading ? "..." : metrics.income}</p>
+        </article>
+      </div>
+
+      <div className="dashboard-divider" role="presentation" />
 
       <section className="dashboard-summary-grid">
         <MetricCard
