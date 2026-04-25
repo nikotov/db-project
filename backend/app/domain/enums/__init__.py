@@ -7,7 +7,6 @@ from app.domain.enums.gender import Gender
 from app.domain.enums.group_membership_status import GroupMembershipStatus
 from app.domain.enums.marital_status import MaritalStatus
 from app.domain.enums.member_attendance_status import MemberAttendanceStatus
-from app.domain.enums.member_status import MemberStatus
 from app.domain.enums.recurrence_type import RecurrenceType
 
 __all__ = [
@@ -18,6 +17,5 @@ __all__ = [
 	"GroupMembershipStatus",
 	"MaritalStatus",
 	"MemberAttendanceStatus",
-	"MemberStatus",
 	"RecurrenceType",
 ]

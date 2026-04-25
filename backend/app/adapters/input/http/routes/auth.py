@@ -1,13 +1,15 @@
 """HTTP route adapter for authentication endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.adapters.input.http.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
-from app.adapters.output.persistence.in_memory_user_account_repository import (
-    InMemoryUserAccountRepository,
+from app.adapters.output.persistence.sqlalchemy_user_account_repository import (
+    SQLAlchemyUserAccountRepository,
 )
-from app.adapters.output.persistence.in_memory_user_log_writer import InMemoryUserLogWriter
+from app.adapters.output.persistence.sqlalchemy_user_log_writer import SQLAlchemyUserLogWriter
 from app.adapters.output.security.jwt_token_service import JWTTokenService
 from app.adapters.output.security.pbkdf2_password_hasher import PBKDF2PasswordHasher
+from app.database import get_db
 from app.domain.services.auth_service import (
     AuthService,
     InvalidCredentialsException,
@@ -18,17 +20,15 @@ from app.ports.input.auth.register_user_use_case import RegisterUserCommand
 
 router = APIRouter()
 
-_auth_service = AuthService(
-    user_repo=InMemoryUserAccountRepository(),
-    password_hasher=PBKDF2PasswordHasher(),
-    token_service=JWTTokenService(),
-    user_log_writer=InMemoryUserLogWriter(),
-)
 
-
-def get_auth_service() -> AuthService:
+def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     """Resolve auth service dependency."""
-    return _auth_service
+    return AuthService(
+        user_repo=SQLAlchemyUserAccountRepository(db),
+        password_hasher=PBKDF2PasswordHasher(),
+        token_service=JWTTokenService(),
+        user_log_writer=SQLAlchemyUserLogWriter(db),
+    )
 
 
 @router.post("/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)

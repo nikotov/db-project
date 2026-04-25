@@ -196,6 +196,8 @@ class SmallGroupTagMap(Base):
 
     small_group_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group.id"), nullable=False, primary_key=True)
     tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group_tag.id"), nullable=False, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
 
     small_group: Mapped["SmallGroup"] = relationship(back_populates="tags", lazy="joined")
     tag: Mapped["SmallGroupTag"] = relationship(back_populates="group_tags", lazy="joined")
