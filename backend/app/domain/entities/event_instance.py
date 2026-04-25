@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+
 @dataclass
 class EventInstance:
     id: int
@@ -10,3 +11,4 @@ class EventInstance:
     end_datetime: datetime
     attendee_count: int
     event_series_id: int
+    attendance_notes: Optional[str] = None

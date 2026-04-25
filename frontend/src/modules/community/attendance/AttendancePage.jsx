@@ -9,6 +9,7 @@ const MOCK_INSTANCES = [
     endAt: "2026-04-21T20:30:00",
     location: "Room 204",
     attendanceType: "individual",
+    registeredMemberIds: [1, 3, 5],
   },
   {
     id: 2,
@@ -17,6 +18,7 @@ const MOCK_INSTANCES = [
     endAt: "2026-04-23T21:30:00",
     location: "Conference Room A",
     attendanceType: "general",
+    registeredMemberIds: [2, 4],
   },
   {
     id: 3,
@@ -25,6 +27,7 @@ const MOCK_INSTANCES = [
     endAt: "2026-04-25T21:30:00",
     location: "Prayer Hall",
     attendanceType: "general",
+    registeredMemberIds: [1, 2, 6],
   },
   {
     id: 4,
@@ -33,6 +36,7 @@ const MOCK_INSTANCES = [
     endAt: "2026-04-27T11:30:00",
     location: "Main Auditorium",
     attendanceType: "individual",
+    registeredMemberIds: [1, 2, 4],
   },
 ];
 
@@ -44,12 +48,12 @@ const MOCK_ATTENDANCE_GROUPS = [
 ];
 
 const MOCK_MEMBERS = [
-  { id: 101, name: "Daniel Gomez" },
-  { id: 102, name: "Mariana Lopez" },
-  { id: 103, name: "Samuel Ortiz" },
-  { id: 104, name: "Elena Vega" },
-  { id: 105, name: "Camila Rivera" },
-  { id: 106, name: "Jorge Mendez" },
+  { id: 1, name: "Daniel Gomez" },
+  { id: 2, name: "Mariana Lopez" },
+  { id: 3, name: "Samuel Ortiz" },
+  { id: 4, name: "Elena Vega" },
+  { id: 5, name: "Camila Rivera" },
+  { id: 6, name: "Jorge Mendez" },
 ];
 
 function formatDateTime(value) {
@@ -72,8 +76,11 @@ function buildInitialGroupCounts() {
   return Object.fromEntries(MOCK_ATTENDANCE_GROUPS.map((group) => [group.id, 0]));
 }
 
-function buildInitialMemberRows() {
-  return MOCK_MEMBERS.map((member) => ({
+function buildInitialMemberRows(instance) {
+  const registeredMemberIds = instance?.registeredMemberIds ?? [];
+  const registeredMembers = MOCK_MEMBERS.filter((member) => registeredMemberIds.includes(member.id));
+
+  return registeredMembers.map((member) => ({
     memberId: member.id,
     name: member.name,
     status: "absent",
@@ -89,7 +96,7 @@ export default function AttendancePage() {
   const [selectedInstanceId, setSelectedInstanceId] = useState(initialInstance.id);
   const [generalTotalCount, setGeneralTotalCount] = useState(0);
   const [groupCounts, setGroupCounts] = useState(buildInitialGroupCounts);
-  const [memberRows, setMemberRows] = useState(buildInitialMemberRows);
+  const [memberRows, setMemberRows] = useState(() => buildInitialMemberRows(initialInstance));
   const [notes, setNotes] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState(null);
 
@@ -104,10 +111,12 @@ export default function AttendancePage() {
   );
 
   const handleInstanceChange = (instanceId) => {
+    const nextInstance = MOCK_INSTANCES.find((instance) => instance.id === instanceId) ?? MOCK_INSTANCES[0];
+
     setSelectedInstanceId(instanceId);
     setGeneralTotalCount(0);
     setGroupCounts(buildInitialGroupCounts());
-    setMemberRows(buildInitialMemberRows());
+    setMemberRows(buildInitialMemberRows(nextInstance));
     setNotes("");
     setLastSavedAt(null);
   };
@@ -205,6 +214,7 @@ export default function AttendancePage() {
                 <button
                   type="button"
                   className="members-secondary-button"
+                  disabled={!memberRows.length}
                   onClick={() =>
                     setMemberRows((current) => current.map((member) => ({ ...member, status: "present" })))
                   }
@@ -214,6 +224,7 @@ export default function AttendancePage() {
                 <button
                   type="button"
                   className="members-secondary-button"
+                  disabled={!memberRows.length}
                   onClick={() =>
                     setMemberRows((current) => current.map((member) => ({ ...member, status: "absent" })))
                   }
@@ -224,39 +235,43 @@ export default function AttendancePage() {
             </div>
 
             <div className="attendance-member-list" role="list" aria-label="Member attendance list">
-              {memberRows.map((member) => (
-                <div key={member.memberId} className="attendance-member-row" role="listitem">
-                  <span>{member.name}</span>
-                  <div className="attendance-member-toggle">
-                    <button
-                      type="button"
-                      className={`attendance-toggle-button ${member.status === "present" ? "attendance-toggle-active" : ""}`}
-                      onClick={() =>
-                        setMemberRows((current) =>
-                          current.map((item) =>
-                            item.memberId === member.memberId ? { ...item, status: "present" } : item
+              {!memberRows.length ? (
+                <p className="members-empty-state">No registered members for this instance.</p>
+              ) : (
+                memberRows.map((member) => (
+                  <div key={member.memberId} className="attendance-member-row" role="listitem">
+                    <span>{member.name}</span>
+                    <div className="attendance-member-toggle">
+                      <button
+                        type="button"
+                        className={`attendance-toggle-button ${member.status === "present" ? "attendance-toggle-active" : ""}`}
+                        onClick={() =>
+                          setMemberRows((current) =>
+                            current.map((item) =>
+                              item.memberId === member.memberId ? { ...item, status: "present" } : item
+                            )
                           )
-                        )
-                      }
-                    >
-                      Present
-                    </button>
-                    <button
-                      type="button"
-                      className={`attendance-toggle-button ${member.status === "absent" ? "attendance-toggle-active" : ""}`}
-                      onClick={() =>
-                        setMemberRows((current) =>
-                          current.map((item) =>
-                            item.memberId === member.memberId ? { ...item, status: "absent" } : item
+                        }
+                      >
+                        Present
+                      </button>
+                      <button
+                        type="button"
+                        className={`attendance-toggle-button ${member.status === "absent" ? "attendance-toggle-active" : ""}`}
+                        onClick={() =>
+                          setMemberRows((current) =>
+                            current.map((item) =>
+                              item.memberId === member.memberId ? { ...item, status: "absent" } : item
+                            )
                           )
-                        )
-                      }
-                    >
-                      Absent
-                    </button>
+                        }
+                      >
+                        Absent
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}

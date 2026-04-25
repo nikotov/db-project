@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class MemberAttendanceStatus(str, Enum):
+    PENDING = "pending"
     ATTENDED = "attended"
     ABSENT = "absent"
     LATE = "late"
