@@ -87,6 +87,21 @@ function GroupsIcon() {
   );
 }
 
+function LogsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="sidebar-item-icon">
+      <path
+        d="M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3 5h8m-8 4h8m-8 4h5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export const COMMUNITY_SIDEBAR_ITEMS = [
   { key: "dashboard", label: "Dashboard", path: "/community/dashboard", icon: <DashboardIcon /> },
   { key: "members", label: "Members", path: "/community/members", icon: <MembersIcon /> },
@@ -94,4 +109,5 @@ export const COMMUNITY_SIDEBAR_ITEMS = [
   { key: "attendance", label: "Attendance", path: "/community/attendance", icon: <AttendanceIcon /> },
   { key: "events", label: "Events", path: "/community/events", icon: <EventsIcon /> },
   { key: "small-groups", label: "Small Groups", path: "/community/small-groups", icon: <GroupsIcon /> },
+  { key: "logs", label: "Logs", path: "/community/logs", icon: <LogsIcon /> },
 ];

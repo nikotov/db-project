@@ -996,6 +996,44 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.logs-table-card {
+  border-radius: 16px;
+  border: 1px solid rgba(73, 104, 160, 0.35);
+  background: linear-gradient(150deg, #112344, #0c1830);
+  overflow: hidden;
+}
+
+.logs-table-scroll {
+  overflow-x: auto;
+}
+
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.logs-table thead th {
+  text-align: left;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #aac1e6;
+  border-bottom: 1px solid rgba(81, 112, 167, 0.35);
+  padding: 0.85rem 1rem;
+}
+
+.logs-table tbody td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(81, 112, 167, 0.2);
+  color: #dce8ff;
+  vertical-align: top;
+}
+
+.logs-table tbody tr:hover {
+  background: rgba(89, 125, 188, 0.12);
+}
+
 .members-page {
   display: flex;
   flex-direction: column;
