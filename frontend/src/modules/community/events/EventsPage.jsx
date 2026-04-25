@@ -93,6 +93,7 @@ const DEFAULT_FILTERS = {
   search: "",
   status: "all",
   recurrenceType: "all",
+  tagIds: [],
 };
 
 const CREATE_INITIAL = {
@@ -183,8 +184,10 @@ export default function EventsPage() {
       const matchesStatus = filters.status === "all" || item.status === filters.status;
       const matchesRecurrenceType =
         filters.recurrenceType === "all" || item.recurrenceType === filters.recurrenceType;
+      const matchesTag =
+        !filters.tagIds.length || filters.tagIds.every((selectedTagId) => item.tagIds.includes(selectedTagId));
 
-      return matchesSearch && matchesStatus && matchesRecurrenceType;
+      return matchesSearch && matchesStatus && matchesRecurrenceType && matchesTag;
     });
   }, [filters, series, tagsById]);
 
@@ -394,8 +397,8 @@ export default function EventsPage() {
           <aside className="members-drawer members-filter-drawer" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
               <h3>Series Filters</h3>
-              <button type="button" className="members-text-button" onClick={() => setFilters(DEFAULT_FILTERS)}>
-                Clear
+              <button type="button" className="members-text-button" onClick={() => setFiltersOpen(false)}>
+                Close
               </button>
             </div>
 
@@ -438,6 +441,49 @@ export default function EventsPage() {
                   ))}
                 </select>
               </label>
+
+              <fieldset className="events-tag-picker">
+                <legend>Tag</legend>
+                <div className="events-tag-picker-list">
+                  <button
+                    type="button"
+                    className={`events-tag-picker-item ${!filters.tagIds.length ? "events-tag-picker-item-selected" : ""}`}
+                    onClick={() => setFilters((current) => ({ ...current, tagIds: [] }))}
+                  >
+                    All tags
+                  </button>
+                  {tags.map((tag) => {
+                    const selected = filters.tagIds.includes(tag.id);
+
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        className={`events-tag-picker-item ${selected ? "events-tag-picker-item-selected" : ""}`}
+                        onClick={() =>
+                          setFilters((current) => {
+                            const isSelected = current.tagIds.includes(tag.id);
+                            return {
+                              ...current,
+                              tagIds: isSelected
+                                ? current.tagIds.filter((value) => value !== tag.id)
+                                : [...current.tagIds, tag.id],
+                            };
+                          })
+                        }
+                        style={{ borderColor: tag.color }}
+                      >
+                        <span className="events-tag-picker-dot" style={{ background: tag.color }} />
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <button type="button" className="members-secondary-button" onClick={() => setFilters(DEFAULT_FILTERS)}>
+                Clear Filters
+              </button>
             </div>
           </aside>
         </div>

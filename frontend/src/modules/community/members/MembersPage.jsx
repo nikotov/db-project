@@ -303,8 +303,8 @@ export default function MembersPage() {
           <aside className="members-drawer members-filter-drawer" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
               <h3>Filters</h3>
-              <button type="button" className="members-text-button" onClick={() => setFilters(DEFAULT_FILTERS)}>
-                Clear
+              <button type="button" className="members-text-button" onClick={() => setFiltersOpen(false)}>
+                Close
               </button>
             </div>
 
@@ -389,6 +389,10 @@ export default function MembersPage() {
                   ))}
                 </select>
               </label>
+
+              <button type="button" className="members-secondary-button" onClick={() => setFilters(DEFAULT_FILTERS)}>
+                Clear Filters
+              </button>
             </div>
           </aside>
         </div>
