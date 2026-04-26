@@ -36,6 +36,12 @@ The active PostgreSQL schema migration path is Alembic in `backend/alembic/versi
 4. Check logs:
    - `docker compose logs -f postgres`
 
+## One-command verification
+
+Run an end-to-end local verification (build, DB health, migration log check, auth/RBAC smoke):
+
+- `./db/scripts/verify.sh`
+
 Note:
 - On first startup (empty volume), Docker will only run minimal bootstrap scripts in `db/init/`.
 - Schema changes are applied through Alembic only.

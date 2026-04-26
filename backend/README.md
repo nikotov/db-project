@@ -101,6 +101,12 @@ Run API + DB integration checks (requires migrated PostgreSQL):
 RUN_INTEGRATION_DB=1 pytest backend/tests/integration -q
 ```
 
+Quick smoke verification from project root:
+
+```bash
+./db/scripts/verify.sh
+```
+
 ## Getting Started
 
 ### 1. Create a virtual environment
