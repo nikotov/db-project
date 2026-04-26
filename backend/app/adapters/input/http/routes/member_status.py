@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.adapters.input.http.deps import get_current_user
+from app.adapters.input.http.deps import get_current_user, require_roles
 from app.adapters.input.http.schemas.catalog import MemberStatusCreate, MemberStatusResponse
 from app.adapters.output.persistence.models import MemberStatus
 from app.database import get_db
@@ -16,7 +16,7 @@ def list_member_statuses(db: Session = Depends(get_db), _: str = Depends(get_cur
 
 
 @router.post("", response_model=MemberStatusResponse, status_code=status.HTTP_201_CREATED)
-def create_member_status(payload: MemberStatusCreate, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
+def create_member_status(payload: MemberStatusCreate, db: Session = Depends(get_db), _: str = Depends(require_roles("admin"))):
     ms = MemberStatus(name=payload.name)
     db.add(ms)
     db.commit()
@@ -33,7 +33,7 @@ def get_member_status(status_id: int, db: Session = Depends(get_db), _: str = De
 
 
 @router.put("/{status_id}", response_model=MemberStatusResponse)
-def update_member_status(status_id: int, payload: MemberStatusCreate, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
+def update_member_status(status_id: int, payload: MemberStatusCreate, db: Session = Depends(get_db), _: str = Depends(require_roles("admin"))):
     ms = db.get(MemberStatus, status_id)
     if not ms:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member status not found")
@@ -44,7 +44,7 @@ def update_member_status(status_id: int, payload: MemberStatusCreate, db: Sessio
 
 
 @router.delete("/{status_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_member_status(status_id: int, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
+def delete_member_status(status_id: int, db: Session = Depends(get_db), _: str = Depends(require_roles("admin"))):
     ms = db.get(MemberStatus, status_id)
     if not ms:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member status not found")
