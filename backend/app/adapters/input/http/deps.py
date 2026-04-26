@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 from datetime import datetime, timezone
+from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -11,6 +12,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.config import settings
 
 _bearer = HTTPBearer(auto_error=True)
+
+
+@dataclass(frozen=True)
+class AuthenticatedUser:
+    username: str
+    role: str
 
 
 def _b64url_decode(segment: str) -> bytes:
@@ -23,7 +30,14 @@ def _b64url_decode(segment: str) -> bytes:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> str:
-    # Validate Bearer JWT and return the subject claim (username)
+    # Validate Bearer JWT and return username from claims.
+    return get_current_principal(credentials).username
+
+
+def get_current_principal(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> AuthenticatedUser:
+    # Validate Bearer JWT and return principal claims.
     token = credentials.credentials
     parts = token.split(".")
     if len(parts) != 3:
@@ -51,8 +65,24 @@ def get_current_user(
     if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
 
-    sub = payload.get("sub")
-    if not sub:
+    username = payload.get("username") or payload.get("sub")
+    if not username:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing subject")
+    role = payload.get("role") or "member"
+    return AuthenticatedUser(username=str(username), role=str(role))
 
-    return sub
+
+def require_roles(*allowed_roles: str):
+    allowed = {role.strip().lower() for role in allowed_roles if role.strip()}
+
+    def _require_role(
+        principal: AuthenticatedUser = Depends(get_current_principal),
+    ) -> AuthenticatedUser:
+        if principal.role.lower() not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions.",
+            )
+        return principal
+
+    return _require_role

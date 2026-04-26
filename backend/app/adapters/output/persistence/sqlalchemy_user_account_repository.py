@@ -18,8 +18,8 @@ class SQLAlchemyUserAccountRepository(UserAccountRepositoryPort):
         statement = select(UserAccount.id).where(UserAccount.username == username)
         return self._db.execute(statement).scalar_one_or_none() is not None
 
-    def create(self, username: str, password_hash: str) -> int:
-        user = UserAccount(username=username, password_hash=password_hash)
+    def create(self, username: str, password_hash: str, role: str = "member") -> int:
+        user = UserAccount(username=username, password_hash=password_hash, role=role)
         self._db.add(user)
         self._db.flush()
         self._db.commit()
@@ -40,4 +40,8 @@ class SQLAlchemyUserAccountRepository(UserAccountRepositoryPort):
 
     def get_user_id_by_username(self, username: str) -> int | None:
         statement = select(UserAccount.id).where(UserAccount.username == username)
+        return self._db.execute(statement).scalar_one_or_none()
+
+    def get_role_by_username(self, username: str) -> str | None:
+        statement = select(UserAccount.role).where(UserAccount.username == username)
         return self._db.execute(statement).scalar_one_or_none()

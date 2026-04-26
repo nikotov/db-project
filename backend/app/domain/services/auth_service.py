@@ -49,8 +49,8 @@ class AuthService:
             )
         
         token = self.token_service.create_access_token(
-            subject=str(user_id),
-            claims={"username": command.username},
+            subject=command.username,
+            claims={"username": command.username, "role": "member"},
         )
 
         return AuthResult(access_token=token)
@@ -69,6 +69,7 @@ class AuthService:
         user_id = self.user_repo.get_user_id_by_username(command.username)
         if user_id is None:
             raise InvalidCredentialsException("Invalid username or password.")
+        role = self.user_repo.get_role_by_username(command.username) or "member"
         now = datetime.now(timezone.utc)
         self.user_repo.update_last_login(user_id, now)
 
@@ -80,8 +81,8 @@ class AuthService:
             )
         
         token = self.token_service.create_access_token(
-            subject=str(user_id),
-            claims={"username": command.username},
+            subject=command.username,
+            claims={"username": command.username, "role": role},
         )
 
         return AuthUserResult(access_token=token)

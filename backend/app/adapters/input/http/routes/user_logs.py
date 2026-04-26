@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.adapters.input.http.deps import get_current_user
+from app.adapters.input.http.deps import get_current_user, require_roles
 from app.adapters.input.http.schemas.user_logs import UserLogResponse
 from app.adapters.output.persistence.models import UserLogs, UserAccount
 from app.database import get_db
@@ -17,7 +17,7 @@ def list_user_logs(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    _: str = Depends(get_current_user),
+    _: str = Depends(require_roles("admin")),
 ):
     # List audit log entries. Optionally filter by user or action type
     q = db.query(UserLogs)
