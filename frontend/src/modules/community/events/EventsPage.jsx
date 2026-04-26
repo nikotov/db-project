@@ -108,6 +108,24 @@ const CREATE_INITIAL = {
   tagIds: [],
 };
 
+function seriesToForm(item) {
+  if (!item) {
+    return CREATE_INITIAL;
+  }
+
+  return {
+    title: item.title ?? "",
+    attendanceType: item.attendanceType ?? "general",
+    recurrenceType: item.recurrenceType ?? "weekly",
+    recurrenceRule: item.recurrenceRule ?? "",
+    time: item.time ?? "",
+    location: item.location ?? "",
+    status: item.status ?? "active",
+    nextOccurrence: item.nextOccurrence ?? "",
+    tagIds: item.tagIds ?? [],
+  };
+}
+
 const TAG_INITIAL = {
   name: "",
   color: "#4f86d9",
@@ -141,6 +159,7 @@ export default function EventsPage() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [createForm, setCreateForm] = useState(CREATE_INITIAL);
   const [tagForm, setTagForm] = useState(TAG_INITIAL);
+  const [editForm, setEditForm] = useState(null);
 
   const tagsById = useMemo(() => Object.fromEntries(tags.map((tag) => [tag.id, tag])), [tags]);
 
@@ -275,6 +294,41 @@ export default function EventsPage() {
     setSeries((current) => current.filter((item) => item.id !== selectedSeries.id));
     setSelectedSeriesId(null);
     setMemberSearch("");
+    setEditForm(null);
+  };
+
+  const handleToggleEditTag = (tagId) => {
+    setEditForm((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const isSelected = current.tagIds.includes(tagId);
+      return {
+        ...current,
+        tagIds: isSelected ? current.tagIds.filter((value) => value !== tagId) : [...current.tagIds, tagId],
+      };
+    });
+  };
+
+  const handleSaveSeries = (event) => {
+    event.preventDefault();
+    if (!selectedSeries || !editForm) {
+      return;
+    }
+
+    const updatedSeries = {
+      ...selectedSeries,
+      ...editForm,
+      title: editForm.title.trim(),
+      location: editForm.location.trim(),
+      time: editForm.time.trim(),
+      recurrenceRule: editForm.recurrenceType === "none" ? "" : editForm.recurrenceRule.trim(),
+      nextOccurrence: editForm.nextOccurrence,
+    };
+
+    setSeries((current) => current.map((item) => (item.id === selectedSeries.id ? updatedSeries : item)));
+    setEditForm(null);
   };
 
   const handleToggleMemberRegistration = (memberId) => {
@@ -331,12 +385,14 @@ export default function EventsPage() {
             onClick={() => {
               setSelectedSeriesId(item.id);
               setMemberSearch("");
+              setEditForm(null);
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 setSelectedSeriesId(item.id);
                 setMemberSearch("");
+                setEditForm(null);
               }
             }}
             aria-label={`Open details for ${item.title}`}
@@ -624,6 +680,7 @@ export default function EventsPage() {
           onClick={() => {
             setSelectedSeriesId(null);
             setMemberSearch("");
+            setEditForm(null);
           }}
           role="presentation"
         >
@@ -636,67 +693,164 @@ export default function EventsPage() {
                 onClick={() => {
                   setSelectedSeriesId(null);
                   setMemberSearch("");
+                  setEditForm(null);
                 }}
               >
                 Close
               </button>
             </div>
 
-            <div className="events-detail-grid" role="list" aria-label="Selected event series details">
-              <p className="events-detail-item" role="listitem">
-                <span>ID</span>
-                <strong>{selectedSeries.id}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Status</span>
-                <strong>{selectedSeries.status}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Recurrence Type</span>
-                <strong>{selectedSeries.recurrenceType}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Attendance Type</span>
-                <strong>{selectedSeries.attendanceType}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Recurrence Rule</span>
-                <strong>{selectedSeries.recurrenceRule || "One-time event"}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Time</span>
-                <strong>{selectedSeries.time || "-"}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Location</span>
-                <strong>{selectedSeries.location || "-"}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Next Occurrence</span>
-                <strong>{formatDate(selectedSeries.nextOccurrence)}</strong>
-              </p>
-              <div className="events-detail-item" role="listitem">
-                <span>Tags</span>
-                <div className="event-series-tag-list">
-                  {selectedSeries.tagIds.length ? (
-                    selectedSeries.tagIds.map((tagId) => {
-                      const tag = tagsById[tagId];
-                      if (!tag) {
-                        return null;
-                      }
+            {editForm ? (
+              <form className="members-add-form" onSubmit={handleSaveSeries}>
+                <label>
+                  Title
+                  <input value={editForm.title} onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))} required />
+                </label>
+                <label>
+                  Attendance Type
+                  <select
+                    value={editForm.attendanceType}
+                    onChange={(event) => setEditForm((current) => ({ ...current, attendanceType: event.target.value }))}
+                  >
+                    <option value="general">general</option>
+                    <option value="individual">individual</option>
+                  </select>
+                </label>
+                <label>
+                  Recurrence Type
+                  <select
+                    value={editForm.recurrenceType}
+                    onChange={(event) => setEditForm((current) => ({ ...current, recurrenceType: event.target.value }))}
+                  >
+                    <option value="none">none</option>
+                    <option value="daily">daily</option>
+                    <option value="weekly">weekly</option>
+                    <option value="monthly">monthly</option>
+                    <option value="yearly">yearly</option>
+                  </select>
+                </label>
+                {editForm.recurrenceType !== "none" ? (
+                  <label>
+                    Recurrence Rule
+                    <input
+                      value={editForm.recurrenceRule}
+                      onChange={(event) => setEditForm((current) => ({ ...current, recurrenceRule: event.target.value }))}
+                      placeholder="e.g. Weekly on Sunday"
+                    />
+                  </label>
+                ) : null}
+                <label>
+                  Time
+                  <input value={editForm.time} onChange={(event) => setEditForm((current) => ({ ...current, time: event.target.value }))} />
+                </label>
+                <label>
+                  Location
+                  <input value={editForm.location} onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))} />
+                </label>
+                <label>
+                  Next Occurrence
+                  <input
+                    type="date"
+                    value={editForm.nextOccurrence}
+                    onChange={(event) => setEditForm((current) => ({ ...current, nextOccurrence: event.target.value }))}
+                  />
+                </label>
+                <fieldset className="events-tag-picker">
+                  <legend>Tags</legend>
+                  <div className="events-tag-picker-list">
+                    {tags.map((tag) => {
+                      const selected = editForm.tagIds.includes(tag.id);
 
                       return (
-                        <span key={`detail-${selectedSeries.id}-${tag.id}`} className="events-tag-pill" style={{ borderColor: tag.color, color: tag.color }}>
+                        <button
+                          key={`edit-${tag.id}`}
+                          type="button"
+                          className={`events-tag-picker-item ${selected ? "events-tag-picker-item-selected" : ""}`}
+                          onClick={() => handleToggleEditTag(tag.id)}
+                          style={{ borderColor: tag.color }}
+                        >
+                          <span className="events-tag-picker-dot" style={{ background: tag.color }} />
                           {tag.name}
-                        </span>
+                        </button>
                       );
-                    })
-                  ) : (
-                    <strong>No tags</strong>
-                  )}
+                    })}
+                  </div>
+                </fieldset>
+                <label>
+                  Status
+                  <select value={editForm.status} onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value }))}>
+                    <option value="draft">draft</option>
+                    <option value="active">active</option>
+                    <option value="paused">paused</option>
+                    <option value="cancelled">cancelled</option>
+                    <option value="completed">completed</option>
+                  </select>
+                </label>
+                <button type="submit" className="members-primary-button">
+                  Save Changes
+                </button>
+              </form>
+            ) : (
+              <div className="events-detail-grid" role="list" aria-label="Selected event series details">
+                <p className="events-detail-item" role="listitem">
+                  <span>ID</span>
+                  <strong>{selectedSeries.id}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Status</span>
+                  <strong>{selectedSeries.status}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Recurrence Type</span>
+                  <strong>{selectedSeries.recurrenceType}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Attendance Type</span>
+                  <strong>{selectedSeries.attendanceType}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Recurrence Rule</span>
+                  <strong>{selectedSeries.recurrenceRule || "One-time event"}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Time</span>
+                  <strong>{selectedSeries.time || "-"}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Location</span>
+                  <strong>{selectedSeries.location || "-"}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Next Occurrence</span>
+                  <strong>{formatDate(selectedSeries.nextOccurrence)}</strong>
+                </p>
+                <div className="events-detail-item" role="listitem">
+                  <span>Tags</span>
+                  <div className="event-series-tag-list">
+                    {selectedSeries.tagIds.length ? (
+                      selectedSeries.tagIds.map((tagId) => {
+                        const tag = tagsById[tagId];
+                        if (!tag) {
+                          return null;
+                        }
+
+                        return (
+                          <span
+                            key={`detail-${selectedSeries.id}-${tag.id}`}
+                            className="events-tag-pill"
+                            style={{ borderColor: tag.color, color: tag.color }}
+                          >
+                            {tag.name}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <strong>No tags</strong>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {selectedSeries.attendanceType === "individual" ? (
               <div className="events-register-panel">
@@ -752,6 +906,15 @@ export default function EventsPage() {
             ) : null}
 
             <div className="detail-modal-actions">
+              {editForm ? (
+                <button type="button" className="members-secondary-button" onClick={() => setEditForm(null)}>
+                  Cancel Edit
+                </button>
+              ) : (
+                <button type="button" className="members-secondary-button" onClick={() => setEditForm(seriesToForm(selectedSeries))}>
+                  Edit Series
+                </button>
+              )}
               <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedSeries}>
                 Remove Series
               </button>

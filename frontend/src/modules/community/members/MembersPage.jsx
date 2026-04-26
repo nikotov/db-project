@@ -109,6 +109,30 @@ const ADD_FORM_INITIAL = {
   family: "",
 };
 
+function memberToForm(member) {
+  if (!member) {
+    return ADD_FORM_INITIAL;
+  }
+
+  return {
+    name: member.name ?? "",
+    middle_name: member.middle_name ?? "",
+    last_name_parental: member.last_name_parental ?? "",
+    last_name_maternal: member.last_name_maternal ?? "",
+    address: member.address ?? "",
+    birth_date: member.birth_date ?? "",
+    gender: member.gender ?? "Female",
+    phone: member.phone ?? "",
+    email: member.email ?? "",
+    marital_status: member.marital_status ?? "single",
+    family_role: member.family_role ?? "member",
+    baptized_location: member.baptized_location ?? "",
+    member_status: member.member_status ?? "active",
+    family: member.family ?? "",
+    is_baptized: Boolean(member.is_baptized),
+  };
+}
+
 function formatValue(value) {
   if (value === null || value === undefined || value === "") {
     return "—";
@@ -157,6 +181,7 @@ export default function MembersPage() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [members, setMembers] = useState(MOCK_MEMBERS);
   const [newMember, setNewMember] = useState(ADD_FORM_INITIAL);
+  const [editMember, setEditMember] = useState(null);
 
   const filterOptions = useMemo(
     () => ({
@@ -226,6 +251,32 @@ export default function MembersPage() {
 
     setMembers((current) => current.filter((member) => member.id !== selectedMember.id));
     setSelectedMember(null);
+    setEditMember(null);
+  };
+
+  const handleSaveSelectedMember = (event) => {
+    event.preventDefault();
+    if (!selectedMember || !editMember) {
+      return;
+    }
+
+    const updatedMember = {
+      ...selectedMember,
+      ...editMember,
+      middle_name: editMember.middle_name || null,
+      last_name_maternal: editMember.last_name_maternal || null,
+      address: editMember.address || null,
+      birth_date: editMember.birth_date || null,
+      phone: editMember.phone || null,
+      email: editMember.email || null,
+      baptized_location: editMember.baptized_location || null,
+      family: editMember.family || null,
+      updated_at: new Date().toISOString().slice(0, 16).replace("T", " "),
+    };
+
+    setMembers((current) => current.map((member) => (member.id === selectedMember.id ? updatedMember : member)));
+    setSelectedMember(updatedMember);
+    setEditMember(null);
   };
 
   return (
@@ -253,11 +304,15 @@ export default function MembersPage() {
               className="member-row"
               role="listitem button"
               tabIndex={0}
-              onClick={() => setSelectedMember(member)}
+              onClick={() => {
+                setSelectedMember(member);
+                setEditMember(null);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   setSelectedMember(member);
+                  setEditMember(null);
                 }
               }}
               aria-label={`Open details for ${formatName(member)}`}
@@ -487,91 +542,205 @@ export default function MembersPage() {
       ) : null}
 
       {selectedMember ? (
-        <div className="members-drawer-backdrop events-modal-backdrop" onClick={() => setSelectedMember(null)} role="presentation">
+        <div
+          className="members-drawer-backdrop events-modal-backdrop"
+          onClick={() => {
+            setSelectedMember(null);
+            setEditMember(null);
+          }}
+          role="presentation"
+        >
           <aside className="events-modal-card members-detail-modal" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
               <h3>{formatName(selectedMember)}</h3>
-              <button type="button" className="members-text-button" onClick={() => setSelectedMember(null)}>
+              <button
+                type="button"
+                className="members-text-button"
+                onClick={() => {
+                  setSelectedMember(null);
+                  setEditMember(null);
+                }}
+              >
                 Close
               </button>
             </div>
 
-            <div className="members-detail-grid" role="list" aria-label="Selected member details">
-              <p className="members-detail-item" role="listitem">
-                <span>ID</span>
-                <strong>{selectedMember.id}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Name</span>
-                <strong>{formatValue(selectedMember.name)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Middle Name</span>
-                <strong>{formatValue(selectedMember.middle_name)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Parental Last Name</span>
-                <strong>{formatValue(selectedMember.last_name_parental)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Maternal Last Name</span>
-                <strong>{formatValue(selectedMember.last_name_maternal)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Address</span>
-                <strong>{formatValue(selectedMember.address)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Birth Date</span>
-                <strong>{formatValue(selectedMember.birth_date)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Gender</span>
-                <strong>{formatValue(selectedMember.gender)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Phone</span>
-                <strong>{formatValue(selectedMember.phone)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Email</span>
-                <strong>{formatValue(selectedMember.email)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Marital Status</span>
-                <strong>{formatValue(selectedMember.marital_status)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Family Role</span>
-                <strong>{formatValue(selectedMember.family_role)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Baptized</span>
-                <strong>{selectedMember.is_baptized ? "Yes" : "No"}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Baptized Location</span>
-                <strong>{formatValue(selectedMember.baptized_location)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Status</span>
-                <strong>{formatValue(selectedMember.member_status)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Family</span>
-                <strong>{formatValue(selectedMember.family)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Created At</span>
-                <strong>{formatDateTime(selectedMember.created_at)}</strong>
-              </p>
-              <p className="members-detail-item" role="listitem">
-                <span>Updated At</span>
-                <strong>{formatDateTime(selectedMember.updated_at)}</strong>
-              </p>
-            </div>
+            {editMember ? (
+              <form className="members-add-form" onSubmit={handleSaveSelectedMember}>
+                <label>
+                  Name
+                  <input value={editMember.name} onChange={(event) => setEditMember((current) => ({ ...current, name: event.target.value }))} required />
+                </label>
+                <label>
+                  Middle Name
+                  <input value={editMember.middle_name} onChange={(event) => setEditMember((current) => ({ ...current, middle_name: event.target.value }))} />
+                </label>
+                <label>
+                  Parental Last Name
+                  <input
+                    value={editMember.last_name_parental}
+                    onChange={(event) => setEditMember((current) => ({ ...current, last_name_parental: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Maternal Last Name
+                  <input value={editMember.last_name_maternal} onChange={(event) => setEditMember((current) => ({ ...current, last_name_maternal: event.target.value }))} />
+                </label>
+                <label>
+                  Address
+                  <input value={editMember.address} onChange={(event) => setEditMember((current) => ({ ...current, address: event.target.value }))} />
+                </label>
+                <label>
+                  Birth Date
+                  <input type="date" value={editMember.birth_date} onChange={(event) => setEditMember((current) => ({ ...current, birth_date: event.target.value }))} />
+                </label>
+                <label>
+                  Gender
+                  <select value={editMember.gender} onChange={(event) => setEditMember((current) => ({ ...current, gender: event.target.value }))}>
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+                <label>
+                  Phone
+                  <input value={editMember.phone} onChange={(event) => setEditMember((current) => ({ ...current, phone: event.target.value }))} />
+                </label>
+                <label>
+                  Email
+                  <input type="email" value={editMember.email} onChange={(event) => setEditMember((current) => ({ ...current, email: event.target.value }))} />
+                </label>
+                <label>
+                  Marital Status
+                  <select value={editMember.marital_status} onChange={(event) => setEditMember((current) => ({ ...current, marital_status: event.target.value }))}>
+                    <option value="single">single</option>
+                    <option value="married">married</option>
+                    <option value="divorced">divorced</option>
+                    <option value="widowed">widowed</option>
+                  </select>
+                </label>
+                <label>
+                  Family Role
+                  <input value={editMember.family_role} onChange={(event) => setEditMember((current) => ({ ...current, family_role: event.target.value }))} />
+                </label>
+                <label>
+                  Baptized
+                  <select
+                    value={String(editMember.is_baptized)}
+                    onChange={(event) => setEditMember((current) => ({ ...current, is_baptized: event.target.value === "true" }))}
+                  >
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </label>
+                <label>
+                  Baptized Location
+                  <input value={editMember.baptized_location} onChange={(event) => setEditMember((current) => ({ ...current, baptized_location: event.target.value }))} />
+                </label>
+                <label>
+                  Member Status
+                  <select value={editMember.member_status} onChange={(event) => setEditMember((current) => ({ ...current, member_status: event.target.value }))}>
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                  </select>
+                </label>
+                <label>
+                  Family
+                  <input value={editMember.family} onChange={(event) => setEditMember((current) => ({ ...current, family: event.target.value }))} />
+                </label>
+
+                <button type="submit" className="members-primary-button">
+                  Save Changes
+                </button>
+              </form>
+            ) : (
+              <div className="members-detail-grid" role="list" aria-label="Selected member details">
+                <p className="members-detail-item" role="listitem">
+                  <span>ID</span>
+                  <strong>{selectedMember.id}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Name</span>
+                  <strong>{formatValue(selectedMember.name)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Middle Name</span>
+                  <strong>{formatValue(selectedMember.middle_name)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Parental Last Name</span>
+                  <strong>{formatValue(selectedMember.last_name_parental)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Maternal Last Name</span>
+                  <strong>{formatValue(selectedMember.last_name_maternal)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Address</span>
+                  <strong>{formatValue(selectedMember.address)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Birth Date</span>
+                  <strong>{formatValue(selectedMember.birth_date)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Gender</span>
+                  <strong>{formatValue(selectedMember.gender)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Phone</span>
+                  <strong>{formatValue(selectedMember.phone)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Email</span>
+                  <strong>{formatValue(selectedMember.email)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Marital Status</span>
+                  <strong>{formatValue(selectedMember.marital_status)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Family Role</span>
+                  <strong>{formatValue(selectedMember.family_role)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Baptized</span>
+                  <strong>{selectedMember.is_baptized ? "Yes" : "No"}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Baptized Location</span>
+                  <strong>{formatValue(selectedMember.baptized_location)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Status</span>
+                  <strong>{formatValue(selectedMember.member_status)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Family</span>
+                  <strong>{formatValue(selectedMember.family)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Created At</span>
+                  <strong>{formatDateTime(selectedMember.created_at)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Updated At</span>
+                  <strong>{formatDateTime(selectedMember.updated_at)}</strong>
+                </p>
+              </div>
+            )}
 
             <div className="detail-modal-actions">
+              {editMember ? (
+                <button type="button" className="members-secondary-button" onClick={() => setEditMember(null)}>
+                  Cancel Edit
+                </button>
+              ) : (
+                <button type="button" className="members-secondary-button" onClick={() => setEditMember(memberToForm(selectedMember))}>
+                  Edit Member
+                </button>
+              )}
               <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedMember}>
                 Remove Member
               </button>

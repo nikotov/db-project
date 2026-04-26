@@ -53,6 +53,21 @@ const CREATE_INITIAL = {
   tagIds: [],
 };
 
+function groupToForm(group) {
+  if (!group) {
+    return CREATE_INITIAL;
+  }
+
+  return {
+    name: group.name ?? "",
+    location: group.location ?? "",
+    meetingDay: group.meetingDay ?? "Monday",
+    meetingTime: group.meetingTime ?? "",
+    status: group.status ?? "active",
+    tagIds: group.tagIds ?? [],
+  };
+}
+
 const TAG_INITIAL = {
   name: "",
   color: "#4f86d9",
@@ -72,6 +87,7 @@ export default function SmallGroupsPage() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [createForm, setCreateForm] = useState(CREATE_INITIAL);
   const [tagForm, setTagForm] = useState(TAG_INITIAL);
+  const [editForm, setEditForm] = useState(null);
 
   const tagsById = useMemo(() => Object.fromEntries(tags.map((tag) => [tag.id, tag])), [tags]);
 
@@ -147,6 +163,39 @@ export default function SmallGroupsPage() {
 
     setGroups((current) => current.filter((group) => group.id !== selectedGroup.id));
     setSelectedGroupId(null);
+    setEditForm(null);
+  };
+
+  const handleToggleEditTag = (tagId) => {
+    setEditForm((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const isSelected = current.tagIds.includes(tagId);
+      return {
+        ...current,
+        tagIds: isSelected ? current.tagIds.filter((value) => value !== tagId) : [...current.tagIds, tagId],
+      };
+    });
+  };
+
+  const handleSaveGroup = (event) => {
+    event.preventDefault();
+    if (!selectedGroup || !editForm) {
+      return;
+    }
+
+    const updatedGroup = {
+      ...selectedGroup,
+      ...editForm,
+      name: editForm.name.trim(),
+      location: editForm.location.trim(),
+      meetingTime: editForm.meetingTime.trim(),
+    };
+
+    setGroups((current) => current.map((group) => (group.id === selectedGroup.id ? updatedGroup : group)));
+    setEditForm(null);
   };
 
   const handleCreateTag = (event) => {
@@ -222,11 +271,15 @@ export default function SmallGroupsPage() {
               className="event-series-row"
               role="listitem button"
               tabIndex={0}
-              onClick={() => setSelectedGroupId(group.id)}
+              onClick={() => {
+                setSelectedGroupId(group.id);
+                setEditForm(null);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   setSelectedGroupId(group.id);
+                  setEditForm(null);
                 }
               }}
               aria-label={`Open details for ${group.name}`}
@@ -479,64 +532,156 @@ export default function SmallGroupsPage() {
       ) : null}
 
       {selectedGroup ? (
-        <div className="members-drawer-backdrop events-modal-backdrop" onClick={() => setSelectedGroupId(null)} role="presentation">
+        <div
+          className="members-drawer-backdrop events-modal-backdrop"
+          onClick={() => {
+            setSelectedGroupId(null);
+            setEditForm(null);
+          }}
+          role="presentation"
+        >
           <aside className="events-modal-card events-detail-modal" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
               <h3>{selectedGroup.name}</h3>
-              <button type="button" className="members-text-button" onClick={() => setSelectedGroupId(null)}>
+              <button
+                type="button"
+                className="members-text-button"
+                onClick={() => {
+                  setSelectedGroupId(null);
+                  setEditForm(null);
+                }}
+              >
                 Close
               </button>
             </div>
 
-            <div className="events-detail-grid" role="list" aria-label="Selected small group details">
-              <p className="events-detail-item" role="listitem">
-                <span>ID</span>
-                <strong>{selectedGroup.id}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Name</span>
-                <strong>{selectedGroup.name}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Location</span>
-                <strong>{selectedGroup.location || "-"}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Meeting Day</span>
-                <strong>{selectedGroup.meetingDay}</strong>
-              </p>
-              <p className="events-detail-item" role="listitem">
-                <span>Meeting Time</span>
-                <strong>{selectedGroup.meetingTime || "-"}</strong>
-              </p>
-              <div className="events-detail-item" role="listitem">
-                <span>Tags</span>
-                <div className="event-series-tag-list">
-                  {selectedGroup.tagIds.length ? (
-                    selectedGroup.tagIds.map((tagId) => {
-                      const tag = tagsById[tagId];
-                      if (!tag) {
-                        return null;
-                      }
-
+            {editForm ? (
+              <form className="members-add-form" onSubmit={handleSaveGroup}>
+                <label>
+                  Name
+                  <input value={editForm.name} onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))} required />
+                </label>
+                <label>
+                  Location
+                  <input value={editForm.location} onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))} required />
+                </label>
+                <label>
+                  Meeting Day
+                  <select value={editForm.meetingDay} onChange={(event) => setEditForm((current) => ({ ...current, meetingDay: event.target.value }))}>
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday">Thursday</option>
+                    <option value="Friday">Friday</option>
+                    <option value="Saturday">Saturday</option>
+                    <option value="Sunday">Sunday</option>
+                  </select>
+                </label>
+                <label>
+                  Meeting Time
+                  <input
+                    value={editForm.meetingTime}
+                    onChange={(event) => setEditForm((current) => ({ ...current, meetingTime: event.target.value }))}
+                    placeholder="e.g. 7:00 PM - 8:30 PM"
+                    required
+                  />
+                </label>
+                <fieldset className="events-tag-picker">
+                  <legend>Tags</legend>
+                  <div className="events-tag-picker-list">
+                    {tags.map((tag) => {
+                      const selected = editForm.tagIds.includes(tag.id);
                       return (
-                        <span key={`detail-${selectedGroup.id}-${tag.id}`} className="events-tag-pill" style={{ borderColor: tag.color, color: tag.color }}>
+                        <button
+                          key={`edit-${tag.id}`}
+                          type="button"
+                          className={`events-tag-picker-item ${selected ? "events-tag-picker-item-selected" : ""}`}
+                          onClick={() => handleToggleEditTag(tag.id)}
+                          style={{ borderColor: tag.color }}
+                        >
+                          <span className="events-tag-picker-dot" style={{ background: tag.color }} />
                           {tag.name}
-                        </span>
+                        </button>
                       );
-                    })
-                  ) : (
-                    <strong>No tags</strong>
-                  )}
+                    })}
+                  </div>
+                </fieldset>
+                <label>
+                  Status
+                  <select value={editForm.status} onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value }))}>
+                    <option value="active">active</option>
+                    <option value="paused">paused</option>
+                    <option value="inactive">inactive</option>
+                  </select>
+                </label>
+                <button type="submit" className="members-primary-button">
+                  Save Changes
+                </button>
+              </form>
+            ) : (
+              <div className="events-detail-grid" role="list" aria-label="Selected small group details">
+                <p className="events-detail-item" role="listitem">
+                  <span>ID</span>
+                  <strong>{selectedGroup.id}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Name</span>
+                  <strong>{selectedGroup.name}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Location</span>
+                  <strong>{selectedGroup.location || "-"}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Meeting Day</span>
+                  <strong>{selectedGroup.meetingDay}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Meeting Time</span>
+                  <strong>{selectedGroup.meetingTime || "-"}</strong>
+                </p>
+                <div className="events-detail-item" role="listitem">
+                  <span>Tags</span>
+                  <div className="event-series-tag-list">
+                    {selectedGroup.tagIds.length ? (
+                      selectedGroup.tagIds.map((tagId) => {
+                        const tag = tagsById[tagId];
+                        if (!tag) {
+                          return null;
+                        }
+
+                        return (
+                          <span
+                            key={`detail-${selectedGroup.id}-${tag.id}`}
+                            className="events-tag-pill"
+                            style={{ borderColor: tag.color, color: tag.color }}
+                          >
+                            {tag.name}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <strong>No tags</strong>
+                    )}
+                  </div>
                 </div>
+                <p className="events-detail-item" role="listitem">
+                  <span>Status</span>
+                  <strong>{selectedGroup.status}</strong>
+                </p>
               </div>
-              <p className="events-detail-item" role="listitem">
-                <span>Status</span>
-                <strong>{selectedGroup.status}</strong>
-              </p>
-            </div>
+            )}
 
             <div className="detail-modal-actions">
+              {editForm ? (
+                <button type="button" className="members-secondary-button" onClick={() => setEditForm(null)}>
+                  Cancel Edit
+                </button>
+              ) : (
+                <button type="button" className="members-secondary-button" onClick={() => setEditForm(groupToForm(selectedGroup))}>
+                  Edit Group
+                </button>
+              )}
               <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedGroup}>
                 Remove Group
               </button>
