@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.adapters.input.http.deps import get_current_user
+from app.adapters.input.http.deps import get_current_user, require_roles
 from app.adapters.input.http.schemas.catalog import FamilyCreate, FamilyResponse
 from app.adapters.output.persistence.models import Family
 from app.database import get_db
@@ -16,7 +16,7 @@ def list_families(db: Session = Depends(get_db), _: str = Depends(get_current_us
 
 
 @router.post("", response_model=FamilyResponse, status_code=status.HTTP_201_CREATED)
-def create_family(payload: FamilyCreate, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
+def create_family(payload: FamilyCreate, db: Session = Depends(get_db), _: str = Depends(require_roles("admin"))):
     family = Family(name=payload.name)
     db.add(family)
     db.commit()
@@ -33,7 +33,7 @@ def get_family(family_id: int, db: Session = Depends(get_db), _: str = Depends(g
 
 
 @router.put("/{family_id}", response_model=FamilyResponse)
-def update_family(family_id: int, payload: FamilyCreate, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
+def update_family(family_id: int, payload: FamilyCreate, db: Session = Depends(get_db), _: str = Depends(require_roles("admin"))):
     family = db.get(Family, family_id)
     if not family:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")
@@ -44,7 +44,7 @@ def update_family(family_id: int, payload: FamilyCreate, db: Session = Depends(g
 
 
 @router.delete("/{family_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_family(family_id: int, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
+def delete_family(family_id: int, db: Session = Depends(get_db), _: str = Depends(require_roles("admin"))):
     family = db.get(Family, family_id)
     if not family:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Family not found")

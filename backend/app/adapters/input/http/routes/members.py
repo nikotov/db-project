@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.adapters.input.http.deps import get_current_user
+from app.adapters.input.http.deps import get_current_user, require_roles
 from app.adapters.input.http.schemas.member import (
     MemberCreateRequest,
     MemberResponse,
@@ -93,7 +93,7 @@ def get_member(
 def create_member(
     payload: MemberCreateRequest,
     member_service: MemberService = Depends(get_member_service),
-    _: str = Depends(get_current_user),
+    _: str = Depends(require_roles("admin")),
 ) -> MemberResponse:
     try:
         now = datetime.now(timezone.utc)
@@ -129,7 +129,7 @@ def update_member(
     member_id: int,
     payload: MemberCreateRequest,
     member_service: MemberService = Depends(get_member_service),
-    _: str = Depends(get_current_user),
+    _: str = Depends(require_roles("admin")),
 ) -> MemberResponse:
     try:
         existing = member_service.get_member(member_id)
@@ -167,7 +167,7 @@ def update_member(
 def delete_member(
     member_id: int,
     member_service: MemberService = Depends(get_member_service),
-    _: str = Depends(get_current_user),
+    _: str = Depends(require_roles("admin")),
 ) -> None:
     try:
         member_service.delete_member(member_id)
