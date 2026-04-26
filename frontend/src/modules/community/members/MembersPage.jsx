@@ -9,12 +9,12 @@ const MOCK_MEMBERS = [
     last_name_maternal: "Perez",
     address: "125 Elm St",
     birth_date: "1994-03-14",
-    gender: "M",
+    gender: "Male",
     phone: "555-0142",
     email: "daniel.gomez@example.com",
     created_at: "2026-04-02 09:20",
     updated_at: "2026-04-08 11:45",
-    marital_status: "Single",
+    marital_status: "single",
     family_role: "son",
     is_baptized: true,
     baptized_location: "Main Campus",
@@ -29,12 +29,12 @@ const MOCK_MEMBERS = [
     last_name_maternal: "Ramos",
     address: "48 Pine Ave",
     birth_date: "1988-11-30",
-    gender: "F",
+    gender: "Female",
     phone: "555-0187",
     email: "mariana.lopez@example.com",
     created_at: "2026-03-24 14:10",
     updated_at: null,
-    marital_status: "Married",
+    marital_status: "married",
     family_role: "mother",
     is_baptized: true,
     baptized_location: "North Branch",
@@ -49,12 +49,12 @@ const MOCK_MEMBERS = [
     last_name_maternal: null,
     address: "91 Lake Rd",
     birth_date: "2001-07-06",
-    gender: "M",
+    gender: "Male",
     phone: null,
     email: "samuel.ortiz@example.com",
     created_at: "2026-04-10 08:15",
     updated_at: "2026-04-11 09:05",
-    marital_status: "Single",
+    marital_status: "single",
     family_role: "member",
     is_baptized: false,
     baptized_location: null,
@@ -69,12 +69,12 @@ const MOCK_MEMBERS = [
     last_name_maternal: "Santos",
     address: "17 River Blvd",
     birth_date: "1979-01-22",
-    gender: "F",
+    gender: "Female",
     phone: "555-0199",
     email: "elena.vega@example.com",
     created_at: "2026-02-28 12:40",
     updated_at: "2026-03-02 16:12",
-    marital_status: "Married",
+    marital_status: "married",
     family_role: "head",
     is_baptized: true,
     baptized_location: "Central Church",
@@ -99,10 +99,10 @@ const ADD_FORM_INITIAL = {
   last_name_maternal: "",
   address: "",
   birth_date: "",
-  gender: "F",
+  gender: "Female",
   phone: "",
   email: "",
-  marital_status: "Single",
+  marital_status: "single",
   family_role: "member",
   baptized_location: "",
   member_status: "active",
@@ -436,8 +436,8 @@ export default function MembersPage() {
               <label>
                 Gender
                 <select value={newMember.gender} onChange={(event) => setNewMember((current) => ({ ...current, gender: event.target.value }))}>
-                  <option value="F">Female</option>
-                  <option value="M">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
                   <option value="Other">Other</option>
                 </select>
               </label>
@@ -452,10 +452,10 @@ export default function MembersPage() {
               <label>
                 Marital Status
                 <select value={newMember.marital_status} onChange={(event) => setNewMember((current) => ({ ...current, marital_status: event.target.value }))}>
-                  <option value="Single">Single</option>
-                  <option value="Married">Married</option>
-                  <option value="Divorced">Divorced</option>
-                  <option value="Widowed">Widowed</option>
+                  <option value="single">single</option>
+                  <option value="married">married</option>
+                  <option value="divorced">divorced</option>
+                  <option value="widowed">widowed</option>
                 </select>
               </label>
               <label>
