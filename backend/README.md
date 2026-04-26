@@ -63,7 +63,7 @@ Notes:
 - Keep SQLAlchemy models under `app/adapters/output/persistence/` and import them in `alembic/env.py` so autogenerate can detect changes.
 - Alembic is the single schema migration path for this project.
 - The baseline schema is tracked by revision `0001_initial_schema` in `alembic/versions/0001_initial_schema.py`.
-- Seed data is optional and should be applied separately from schema migrations.
+- Baseline seed data is applied through migration `0002_user_role_and_baseline_seed`.
 
 ### Local DB Bootstrap Flow
 
@@ -79,10 +79,26 @@ Then from `backend/`:
 alembic upgrade head
 ```
 
-Optional seed load (from project root):
+Optional additional seed load (from project root):
 
 ```bash
 cat db/seeds/001_seed_dev.sql | docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+```
+
+## Security Settings
+
+Configure these variables in `.env` / deployment environment:
+
+- `APP_ENV`: `development`, `test`, or `production`.
+- `JWT_SECRET_KEY`: required in production (do not use defaults).
+- `CORS_ALLOW_ORIGINS`: comma-separated origins, e.g. `http://localhost:3000,https://your-domain`.
+
+## Integration Checks
+
+Run API + DB integration checks (requires migrated PostgreSQL):
+
+```bash
+RUN_INTEGRATION_DB=1 pytest backend/tests/integration -q
 ```
 
 ## Getting Started

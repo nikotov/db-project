@@ -25,7 +25,10 @@ The active PostgreSQL schema migration path is Alembic in `backend/alembic/versi
 ## Quick start
 
 1. Copy environment variables:
-   - `cp .env.example .env`
+   - Create `.env` with at least:
+     - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`
+     - `JWT_SECRET_KEY`
+     - `CORS_ALLOW_ORIGINS`
 2. Start PostgreSQL:
    - `docker compose up -d`
 3. Apply DB schema migrations:
