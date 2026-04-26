@@ -6,6 +6,7 @@ import LoginView from "./modules/login/LoginView";
 import CommunityShell from "./modules/community/CommunityShell";
 import DashboardPage from "./modules/community/dashboard/DashboardPage";
 import MembersPage from "./modules/community/members/MembersPage";
+import FamiliesPage from "./modules/community/families/FamiliesPage";
 import CalendarPage from "./modules/community/calendar/CalendarPage";
 import EventsPage from "./modules/community/events/EventsPage";
 import SmallGroupsPage from "./modules/community/small-groups/SmallGroupsPage";
@@ -173,6 +174,7 @@ export default function App() {
             element={<DashboardPage dashboardLoading={dashboardLoading} metrics={metrics} />}
           />
           <Route path="members" element={<MembersPage />} />
+          <Route path="families" element={<FamiliesPage />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="events" element={<EventsPage />} />

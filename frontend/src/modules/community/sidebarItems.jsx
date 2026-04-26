@@ -27,6 +27,21 @@ function MembersIcon() {
   );
 }
 
+function FamiliesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="sidebar-item-icon">
+      <path
+        d="M4 7h16M4 20h16M6 7v13m12-13v13M9 4h6v3H9V4Zm3 6v5m-2.5-2.5H14.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function CalendarIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="sidebar-item-icon">
@@ -105,6 +120,7 @@ function LogsIcon() {
 export const COMMUNITY_SIDEBAR_ITEMS = [
   { key: "dashboard", label: "Dashboard", path: "/community/dashboard", icon: <DashboardIcon /> },
   { key: "members", label: "Members", path: "/community/members", icon: <MembersIcon /> },
+  { key: "families", label: "Families", path: "/community/families", icon: <FamiliesIcon /> },
   { key: "calendar", label: "Calendar", path: "/community/calendar", icon: <CalendarIcon /> },
   { key: "attendance", label: "Attendance", path: "/community/attendance", icon: <AttendanceIcon /> },
   { key: "events", label: "Events", path: "/community/events", icon: <EventsIcon /> },
