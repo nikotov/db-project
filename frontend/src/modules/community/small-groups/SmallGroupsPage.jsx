@@ -16,6 +16,10 @@ const MOCK_SMALL_GROUPS = [
     meetingTime: "7:00 PM - 8:30 PM",
     tagIds: [1, 3],
     status: "active",
+    registeredMembers: [
+      { memberId: 1, status: "member" },
+      { memberId: 3, status: "leader" },
+    ],
   },
   {
     id: 2,
@@ -25,6 +29,11 @@ const MOCK_SMALL_GROUPS = [
     meetingTime: "5:30 PM - 7:00 PM",
     tagIds: [2, 4],
     status: "active",
+    registeredMembers: [
+      { memberId: 2, status: "member" },
+      { memberId: 4, status: "member" },
+      { memberId: 5, status: "unknown" },
+    ],
   },
   {
     id: 3,
@@ -34,8 +43,20 @@ const MOCK_SMALL_GROUPS = [
     meetingTime: "6:30 PM - 8:00 PM",
     tagIds: [3],
     status: "paused",
+    registeredMembers: [{ memberId: 6, status: "leader" }],
   },
 ];
+
+const MOCK_MEMBERS = [
+  { id: 1, name: "Daniel Gomez", family: "Gomez Family" },
+  { id: 2, name: "Mariana Lopez", family: "Lopez Family" },
+  { id: 3, name: "Samuel Ortiz", family: "Ortiz Family" },
+  { id: 4, name: "Elena Vega", family: "Vega Family" },
+  { id: 5, name: "Camila Rivera", family: "Rivera Family" },
+  { id: 6, name: "Jorge Mendez", family: "Mendez Family" },
+];
+
+const MEMBER_STATUS_OPTIONS = ["member", "leader", "unknown"];
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -84,6 +105,8 @@ export default function SmallGroupsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberStatusDrafts, setMemberStatusDrafts] = useState({});
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [createForm, setCreateForm] = useState(CREATE_INITIAL);
   const [tagForm, setTagForm] = useState(TAG_INITIAL);
@@ -95,6 +118,33 @@ export default function SmallGroupsPage() {
     () => groups.find((group) => group.id === selectedGroupId) ?? null,
     [groups, selectedGroupId]
   );
+
+  const selectedGroupRegisteredMembers = selectedGroup?.registeredMembers ?? [];
+
+  const getMemberRegistrationKey = (groupId, memberId) => `${groupId}:${memberId}`;
+
+  const getRegisteredMemberStatus = (memberId) => {
+    const registration = selectedGroupRegisteredMembers.find((item) => item.memberId === memberId);
+    return registration?.status ?? null;
+  };
+
+  const getDraftMemberStatus = (memberId) => {
+    if (!selectedGroup) {
+      return "member";
+    }
+
+    const key = getMemberRegistrationKey(selectedGroup.id, memberId);
+    return memberStatusDrafts[key] ?? getRegisteredMemberStatus(memberId) ?? "member";
+  };
+
+  const filteredMembers = useMemo(() => {
+    const search = memberSearch.trim().toLowerCase();
+
+    return MOCK_MEMBERS.filter((member) => {
+      const searchable = `${member.name} ${member.family}`.toLowerCase();
+      return !search || searchable.includes(search);
+    });
+  }, [memberSearch]);
 
   const filterOptions = useMemo(
     () => ({
@@ -196,6 +246,69 @@ export default function SmallGroupsPage() {
 
     setGroups((current) => current.map((group) => (group.id === selectedGroup.id ? updatedGroup : group)));
     setEditForm(null);
+  };
+
+  const handleSetMemberDraftStatus = (memberId, status) => {
+    if (!selectedGroup) {
+      return;
+    }
+
+    const key = getMemberRegistrationKey(selectedGroup.id, memberId);
+    setMemberStatusDrafts((current) => ({
+      ...current,
+      [key]: status,
+    }));
+
+    setGroups((current) =>
+      current.map((group) => {
+        if (group.id !== selectedGroup.id) {
+          return group;
+        }
+
+        const registeredMembers = group.registeredMembers ?? [];
+        const existing = registeredMembers.find((item) => item.memberId === memberId);
+        if (!existing) {
+          return group;
+        }
+
+        return {
+          ...group,
+          registeredMembers: registeredMembers.map((item) =>
+            item.memberId === memberId ? { ...item, status } : item
+          ),
+        };
+      })
+    );
+  };
+
+  const handleToggleMemberRegistration = (memberId) => {
+    if (!selectedGroup) {
+      return;
+    }
+
+    setGroups((current) =>
+      current.map((group) => {
+        if (group.id !== selectedGroup.id) {
+          return group;
+        }
+
+        const registeredMembers = group.registeredMembers ?? [];
+        const existing = registeredMembers.find((item) => item.memberId === memberId);
+        const draftStatus = getDraftMemberStatus(memberId);
+
+        if (existing) {
+          return {
+            ...group,
+            registeredMembers: registeredMembers.filter((item) => item.memberId !== memberId),
+          };
+        }
+
+        return {
+          ...group,
+          registeredMembers: [...registeredMembers, { memberId, status: draftStatus || "member" }],
+        };
+      })
+    );
   };
 
   const handleCreateTag = (event) => {
@@ -537,6 +650,7 @@ export default function SmallGroupsPage() {
           onClick={() => {
             setSelectedGroupId(null);
             setEditForm(null);
+            setMemberSearch("");
           }}
           role="presentation"
         >
@@ -549,6 +663,7 @@ export default function SmallGroupsPage() {
                 onClick={() => {
                   setSelectedGroupId(null);
                   setEditForm(null);
+                    setMemberSearch("");
                 }}
               >
                 Close
@@ -671,6 +786,72 @@ export default function SmallGroupsPage() {
                 </p>
               </div>
             )}
+
+            <div className="events-register-panel">
+              <div className="events-register-panel-head">
+                <div>
+                  <h3>Register Members</h3>
+                </div>
+
+                <p className="events-register-count">{selectedGroupRegisteredMembers.length} registered</p>
+              </div>
+
+              <label className="events-register-search">
+                Search members
+                <input
+                  value={memberSearch}
+                  onChange={(event) => setMemberSearch(event.target.value)}
+                  placeholder="Name or family"
+                />
+              </label>
+
+              <div className="events-register-list" role="list" aria-label="Member registration list">
+                {filteredMembers.length ? (
+                  filteredMembers.map((member) => {
+                    const registeredStatus = getRegisteredMemberStatus(member.id);
+                    const isRegistered = Boolean(registeredStatus);
+                    const draftStatus = getDraftMemberStatus(member.id);
+
+                    return (
+                      <div key={member.id} className="events-register-row" role="listitem">
+                        <div className="events-register-row-main">
+                          <strong>{member.name}</strong>
+                          <span>{member.family}</span>
+                        </div>
+
+                        <div className="events-register-row-actions">
+                          <span className={`events-register-pill ${isRegistered ? "events-register-pill-active" : ""}`}>
+                            {isRegistered ? "Registered" : "Not registered"}
+                          </span>
+                          <label className="events-register-status-select">
+                            Status
+                            <select
+                              value={draftStatus}
+                              onChange={(event) => handleSetMemberDraftStatus(member.id, event.target.value)}
+                            >
+                              {MEMBER_STATUS_OPTIONS.map((status) => (
+                                <option key={status} value={status}>
+                                  {status}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <button
+                            type="button"
+                            className={isRegistered ? "events-tag-remove-button" : "members-secondary-button"}
+                            onClick={() => handleToggleMemberRegistration(member.id)}
+                          >
+                            {isRegistered ? "Unregister" : "Register as member"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="events-register-empty">No members match your search.</p>
+                )}
+              </div>
+            </div>
 
             <div className="detail-modal-actions">
               {editForm ? (
