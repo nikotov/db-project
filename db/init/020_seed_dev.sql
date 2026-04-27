@@ -1,1 +1,0 @@
--- Development seed data is applied after Alembic migrations.
