@@ -62,7 +62,7 @@ export default function LogsPage({ token: providedToken }) {
       return;
     }
     setLoading(true);
-    setError("");d
+    setError("");
     try {
       const [usersPayload, logsPayload] = await Promise.all([
         fetchUsers(token),
