@@ -53,12 +53,16 @@ export default function LogsPage({ token: providedToken }) {
     [users]
   );
 
+  const addUserUsernameWarning = newUser.username.trim().length > 0 && newUser.username.trim().length < 8;
+  const addUserPasswordWarning = newUser.password.trim().length > 0 && newUser.password.trim().length < 8;
+  const addUserHasWarnings = addUserUsernameWarning || addUserPasswordWarning;
+
   async function loadData() {
     if (!token) {
       return;
     }
     setLoading(true);
-    setError("");
+    setError("");d
     try {
       const [usersPayload, logsPayload] = await Promise.all([
         fetchUsers(token),
@@ -84,6 +88,11 @@ export default function LogsPage({ token: providedToken }) {
     const username = newUser.username.trim().toLowerCase();
     const password = newUser.password.trim();
     if (!username || !password) {
+      return;
+    }
+
+    if (username.length < 8 || password.length < 8) {
+      setError("Username and password must be at least 8 characters long.");
       return;
     }
 
@@ -277,6 +286,7 @@ export default function LogsPage({ token: providedToken }) {
                   placeholder="e.g. jrivera"
                   required
                 />
+                {addUserUsernameWarning ? <span className="events-register-warning">Use at least 8 characters.</span> : null}
               </label>
               <label>
                 Password
@@ -286,8 +296,9 @@ export default function LogsPage({ token: providedToken }) {
                   onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
                   required
                 />
+                {addUserPasswordWarning ? <span className="events-register-warning">Use at least 8 characters.</span> : null}
               </label>
-              <button type="submit" className="members-primary-button">
+              <button type="submit" className="members-primary-button" disabled={addUserHasWarnings}>
                 Save User
               </button>
             </form>
