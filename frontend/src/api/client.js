@@ -187,11 +187,62 @@ export const fetchSmallGroups = (token) => apiFetch("/small-groups", token);
 export const fetchSmallGroupTags = (token) => apiFetch("/small-group-tags", token);
 export const fetchGroupMemberships = (token, groupId) =>
     apiFetch(`/group-memberships${groupId ? `?group_id=${groupId}` : ""}`, token);
+export async function createSmallGroup(token, payload) {
+    return apiFetch("/small-groups", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function updateSmallGroup(token, groupId, payload) {
+    return apiFetch(`/small-groups/${groupId}`, token, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteSmallGroup(token, groupId) {
+    return apiFetch(`/small-groups/${groupId}`, token, {
+        method: "DELETE",
+    });
+}
+export async function createSmallGroupTag(token, payload) {
+    return apiFetch("/small-group-tags", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteSmallGroupTag(token, tagId) {
+    return apiFetch(`/small-group-tags/${tagId}`, token, {
+        method: "DELETE",
+    });
+}
+export async function createGroupMembership(token, payload) {
+    return apiFetch("/group-memberships", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteGroupMembership(token, membershipId) {
+    return apiFetch(`/group-memberships/${membershipId}`, token, {
+        method: "DELETE",
+    });
+}
 
 // Attendance
 export const fetchAttendanceGroups = (token) => apiFetch("/attendance-groups", token);
 export const fetchMemberAttendance = (token, instanceId) =>
     apiFetch(`/attendance/members${instanceId ? `?event_instance_id=${instanceId}` : ""}`, token);
+export async function upsertGeneralAttendance(token, payload) {
+    return apiFetch("/attendance/general", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function upsertMemberAttendance(token, payload) {
+    return apiFetch("/attendance/member", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
 
 // User Logs
 export const fetchUserLogs = (token, params = "") =>
