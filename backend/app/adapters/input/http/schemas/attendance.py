@@ -1,4 +1,6 @@
 """HTTP schemas for attendance routes."""
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums.member_attendance_status import MemberAttendanceStatus
@@ -29,6 +31,14 @@ class MemberAttendanceResponse(BaseModel):
     member_id: int
     attendance_status: MemberAttendanceStatus
     registration_status: RegistrationStatus
+    member_name: Optional[str] = None
+
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        instance = super().model_validate(obj, *args, **kwargs)
+        if hasattr(obj, "member") and obj.member is not None:
+            instance.member_name = obj.member.name
+        return instance
 
 
 class AttendanceGroupCreate(BaseModel):

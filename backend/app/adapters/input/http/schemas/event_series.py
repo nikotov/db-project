@@ -66,6 +66,12 @@ class EventInstanceCreate(BaseModel):
     attendee_count: int = Field(default=0, ge=0)
 
 
+class GroupCountResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    attendance_group_id: int
+    count: int
+
+
 class EventInstanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -75,3 +81,21 @@ class EventInstanceResponse(BaseModel):
     location: Optional[str]
     attendance_notes: Optional[str]
     attendee_count: int
+    # Denormalized from parent series for frontend convenience
+    series_name: Optional[str] = None
+    attendance_type: Optional[AttendanceType] = None
+    tags: list[EventTagResponse] = Field(default_factory=list)
+    group_counts: list[GroupCountResponse] = Field(default_factory=list)
+
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        instance = super().model_validate(obj, *args, **kwargs)
+        # Populate denormalized fields from the joined series relationship
+        if hasattr(obj, "series") and obj.series is not None:
+            instance.series_name = obj.series.name
+            instance.attendance_type = obj.series.attendance_type
+            instance.tags = [
+                EventTagResponse(id=t.event_tag.id, name=t.event_tag.name, color=t.event_tag.color)
+                for t in (obj.series.tags or [])
+            ]
+        return instance
