@@ -1,4 +1,5 @@
 const API_PREFIX = "/api/v1";
+const USER_STORAGE_KEY = "db-project-user";
 
 const DASHBOARD_FALLBACK = {
     lastSundayServiceAttendance: 0,
@@ -18,6 +19,27 @@ export async function login(username, password) {
     });
     if (!response.ok) return null;
     return response.json();
+}
+
+export function getStoredSessionUser() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    const raw = window.sessionStorage.getItem(USER_STORAGE_KEY);
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+export function getStoredAccessToken() {
+    return getStoredSessionUser()?.access_token ?? "";
 }
 
 export async function fetchDashboardMetrics(token) {
@@ -66,20 +88,99 @@ export async function apiFetch(path, token, options = {}) {
 // Members
 export const fetchMembers = (token, params = "") =>
     apiFetch(`/members${params}`, token);
+export async function createMember(token, payload) {
+    return apiFetch("/members", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function updateMember(token, memberId, payload) {
+    return apiFetch(`/members/${memberId}`, token, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteMember(token, memberId) {
+    return apiFetch(`/members/${memberId}`, token, {
+        method: "DELETE",
+    });
+}
 
 // Families 
 export const fetchFamilies = (token) => apiFetch("/families", token);
+export async function createFamily(token, payload) {
+    return apiFetch("/families", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function updateFamily(token, familyId, payload) {
+    return apiFetch(`/families/${familyId}`, token, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteFamily(token, familyId) {
+    return apiFetch(`/families/${familyId}`, token, {
+        method: "DELETE",
+    });
+}
 
 // Member Status 
 export const fetchMemberStatuses = (token) => apiFetch("/member-status", token);
 
 // Event Series 
 export const fetchEventSeries = (token) => apiFetch("/event-series", token);
+export async function createEventSeries(token, payload) {
+    return apiFetch("/event-series", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function updateEventSeries(token, seriesId, payload) {
+    return apiFetch(`/event-series/${seriesId}`, token, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteEventSeries(token, seriesId) {
+    return apiFetch(`/event-series/${seriesId}`, token, {
+        method: "DELETE",
+    });
+}
 export const fetchEventInstances = (token, seriesId) =>
     apiFetch(`/event-instances${seriesId ? `?series_id=${seriesId}` : ""}`, token);
+export async function createEventInstance(token, payload) {
+    return apiFetch("/event-instances", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function updateEventInstance(token, instanceId, payload) {
+    return apiFetch(`/event-instances/${instanceId}`, token, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteEventInstance(token, instanceId) {
+    return apiFetch(`/event-instances/${instanceId}`, token, {
+        method: "DELETE",
+    });
+}
 
 // Event Tags
 export const fetchEventTags = (token) => apiFetch("/event-tags", token);
+export async function createEventTag(token, payload) {
+    return apiFetch("/event-tags", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteEventTag(token, tagId) {
+    return apiFetch(`/event-tags/${tagId}`, token, {
+        method: "DELETE",
+    });
+}
 
 // Small Groups
 export const fetchSmallGroups = (token) => apiFetch("/small-groups", token);

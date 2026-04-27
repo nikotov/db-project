@@ -1,93 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const MOCK_EVENT_TAGS = [
-  { id: 1, name: "church", color: "#4f86d9" },
-  { id: 2, name: "youth", color: "#7c5cff" },
-  { id: 3, name: "prayer", color: "#2f9e7a" },
-  { id: 4, name: "outreach", color: "#e08a2e" },
-];
-
-const MOCK_MEMBERS = [
-  { id: 1, name: "Daniel Gomez", family: "Gomez Family" },
-  { id: 2, name: "Mariana Lopez", family: "Lopez Family" },
-  { id: 3, name: "Samuel Ortiz", family: "Ortiz Family" },
-  { id: 4, name: "Elena Vega", family: "Vega Family" },
-  { id: 5, name: "Camila Rivera", family: "Rivera Family" },
-  { id: 6, name: "Jorge Mendez", family: "Mendez Family" },
-];
-
-const MOCK_EVENT_SERIES = [
-  {
-    id: 1,
-    title: "Sunday Service",
-    attendanceType: "individual",
-    recurrenceType: "weekly",
-    recurrenceRule: "Weekly on Sunday",
-    time: "10:00 - 11:45",
-    location: "Main Auditorium",
-    status: "active",
-    category: "service",
-    nextOccurrence: "2026-04-26",
-    tagIds: [1],
-    registeredMemberIds: [1, 2, 4],
-  },
-  {
-    id: 2,
-    title: "Youth Bible Study",
-    attendanceType: "individual",
-    recurrenceType: "weekly",
-    recurrenceRule: "Weekly on Friday",
-    time: "19:00 - 20:30",
-    location: "Room B-12",
-    status: "active",
-    category: "study",
-    nextOccurrence: "2026-04-24",
-    tagIds: [1, 2],
-    registeredMemberIds: [1, 3, 5],
-  },
-  {
-    id: 3,
-    title: "Leaders Prayer",
-    attendanceType: "general",
-    recurrenceType: "weekly",
-    recurrenceRule: "Biweekly on Wednesday",
-    time: "06:30 - 07:15",
-    location: "Prayer Hall",
-    status: "paused",
-    category: "prayer",
-    nextOccurrence: "2026-04-29",
-    tagIds: [3],
-    registeredMemberIds: [2, 4],
-  },
-  {
-    id: 4,
-    title: "Community Outreach",
-    attendanceType: "general",
-    recurrenceType: "monthly",
-    recurrenceRule: "Monthly on 2nd Saturday",
-    time: "09:00 - 12:00",
-    location: "City Center",
-    status: "active",
-    category: "outreach",
-    nextOccurrence: "2026-05-09",
-    tagIds: [4],
-    registeredMemberIds: [1, 2, 3, 4],
-  },
-  {
-    id: 5,
-    title: "New Members Welcome",
-    attendanceType: "general",
-    recurrenceType: "none",
-    recurrenceRule: "One-time event",
-    time: "18:00 - 19:00",
-    location: "Lobby",
-    status: "draft",
-    category: "service",
-    nextOccurrence: "2026-05-12",
-    tagIds: [1],
-    registeredMemberIds: [5, 6],
-  },
-];
+import {
+  createEventInstance,
+  createEventSeries,
+  createEventTag,
+  deleteEventSeries,
+  deleteEventTag,
+  fetchEventInstances,
+  fetchEventSeries,
+  fetchEventTags,
+  getStoredAccessToken,
+  updateEventSeries,
+} from "../../../api/client";
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -101,16 +25,27 @@ const CREATE_INITIAL = {
   attendanceType: "general",
   recurrenceType: "weekly",
   recurrenceRule: "",
-  time: "",
+  startTime: "",
+  endTime: "",
   location: "",
   status: "active",
   nextOccurrence: "",
   tagIds: [],
 };
 
+const TAG_INITIAL = {
+  name: "",
+  color: "#4f86d9",
+};
+
+function emptyToNull(value) {
+  const trimmed = String(value ?? "").trim();
+  return trimmed ? trimmed : null;
+}
+
 function seriesToForm(item) {
   if (!item) {
-    return CREATE_INITIAL;
+    return { ...CREATE_INITIAL };
   }
 
   return {
@@ -118,18 +53,14 @@ function seriesToForm(item) {
     attendanceType: item.attendanceType ?? "general",
     recurrenceType: item.recurrenceType ?? "weekly",
     recurrenceRule: item.recurrenceRule ?? "",
-    time: item.time ?? "",
+    startTime: item.startTime ?? "",
+    endTime: item.endTime ?? "",
     location: item.location ?? "",
     status: item.status ?? "active",
     nextOccurrence: item.nextOccurrence ?? "",
     tagIds: item.tagIds ?? [],
   };
 }
-
-const TAG_INITIAL = {
-  name: "",
-  color: "#4f86d9",
-};
 
 function formatDate(dateText) {
   if (!dateText) {
@@ -148,18 +79,167 @@ function formatDate(dateText) {
   });
 }
 
+function formatTimeForInput(value) {
+  if (!value) {
+    return "";
+  }
+  return String(value).slice(0, 5);
+}
+
+function formatTimeRange(startTime, endTime) {
+  const start = formatTimeForInput(startTime);
+  const end = formatTimeForInput(endTime);
+  if (!start && !end) {
+    return "-";
+  }
+  if (start && end) {
+    return `${start} - ${end}`;
+  }
+  return start || end;
+}
+
+function toIsoDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
+
+function mapSeriesForUi(seriesRows, instanceRows) {
+  const bySeriesId = instanceRows.reduce((acc, row) => {
+    if (!acc[row.event_series_id]) {
+      acc[row.event_series_id] = [];
+    }
+    acc[row.event_series_id].push(row);
+    return acc;
+  }, {});
+
+  const now = new Date();
+
+  return seriesRows.map((item) => {
+    const instances = (bySeriesId[item.id] ?? []).slice().sort((a, b) => {
+      return new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime();
+    });
+
+    const nextInstance = instances.find((instance) => new Date(instance.start_datetime) >= now) ?? instances[0] ?? null;
+
+    return {
+      id: item.id,
+      title: item.name,
+      attendanceType: item.attendance_type,
+      recurrenceType: item.recurrence_type,
+      recurrenceRule: item.recurrence_rule,
+      startTime: formatTimeForInput(item.start_time),
+      endTime: formatTimeForInput(item.end_time),
+      location: item.location,
+      status: item.status,
+      nextOccurrence: nextInstance ? toIsoDate(nextInstance.start_datetime) : "",
+      tagIds: (item.tags ?? []).map((tag) => tag.id),
+      tags: item.tags ?? [],
+      instanceCount: instances.length,
+    };
+  });
+}
+
+function buildSeriesPayload(form) {
+  return {
+    name: form.title.trim(),
+    description: null,
+    attendance_type: form.attendanceType,
+    recurrence_type: form.recurrenceType,
+    recurrence_rule: form.recurrenceType === "none" ? null : emptyToNull(form.recurrenceRule),
+    status: form.status,
+    location: emptyToNull(form.location),
+    start_time: form.startTime || null,
+    end_time: form.endTime || null,
+    tag_ids: form.tagIds,
+  };
+}
+
+function buildOneTimeInstancePayload(seriesId, form) {
+  if (form.recurrenceType !== "none" || !form.nextOccurrence || !form.startTime || !form.endTime) {
+    return null;
+  }
+
+  return {
+    event_series_id: seriesId,
+    start_datetime: `${form.nextOccurrence}T${form.startTime}:00`,
+    end_datetime: `${form.nextOccurrence}T${form.endTime}:00`,
+    location: emptyToNull(form.location),
+    attendance_notes: null,
+    attendee_count: 0,
+  };
+}
+
 export default function EventsPage() {
-  const [series, setSeries] = useState(MOCK_EVENT_SERIES);
-  const [tags, setTags] = useState(MOCK_EVENT_TAGS);
+  const [series, setSeries] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [instances, setInstances] = useState([]);
   const [selectedSeriesId, setSelectedSeriesId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
-  const [memberSearch, setMemberSearch] = useState("");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [createForm, setCreateForm] = useState(CREATE_INITIAL);
+  const [createForm, setCreateForm] = useState({ ...CREATE_INITIAL });
   const [tagForm, setTagForm] = useState(TAG_INITIAL);
   const [editForm, setEditForm] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadData() {
+      const token = getStoredAccessToken();
+      if (!token) {
+        if (active) {
+          setError("Missing access token. Please sign in again.");
+          setLoading(false);
+        }
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const [seriesRows, tagRows, instanceRows] = await Promise.all([
+          fetchEventSeries(token),
+          fetchEventTags(token),
+          fetchEventInstances(token),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setTags(tagRows);
+        setInstances(instanceRows);
+        setSeries(mapSeriesForUi(seriesRows, instanceRows));
+        setError("");
+      } catch (exception) {
+        if (active) {
+          setError(exception instanceof Error ? exception.message : "Failed to load events.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const tagsById = useMemo(() => Object.fromEntries(tags.map((tag) => [tag.id, tag])), [tags]);
 
@@ -167,17 +247,6 @@ export default function EventsPage() {
     () => series.find((item) => item.id === selectedSeriesId) ?? null,
     [series, selectedSeriesId]
   );
-
-  const selectedSeriesRegisteredMemberIds = selectedSeries?.registeredMemberIds ?? [];
-
-  const filteredMembers = useMemo(() => {
-    const search = memberSearch.trim().toLowerCase();
-
-    return MOCK_MEMBERS.filter((member) => {
-      const searchable = `${member.name} ${member.family}`.toLowerCase();
-      return !search || searchable.includes(search);
-    });
-  }, [memberSearch]);
 
   const filterOptions = useMemo(
     () => ({
@@ -196,8 +265,8 @@ export default function EventsPage() {
         !search ||
         item.title.toLowerCase().includes(search) ||
         item.attendanceType.toLowerCase().includes(search) ||
-        item.location.toLowerCase().includes(search) ||
-        item.recurrenceRule.toLowerCase().includes(search) ||
+        (item.location ?? "").toLowerCase().includes(search) ||
+        (item.recurrenceRule ?? "").toLowerCase().includes(search) ||
         item.recurrenceType.toLowerCase().includes(search) ||
         tagNames.includes(search);
       const matchesStatus = filters.status === "all" || item.status === filters.status;
@@ -210,26 +279,44 @@ export default function EventsPage() {
     });
   }, [filters, series, tagsById]);
 
-  const handleCreate = (event) => {
-    event.preventDefault();
+  const refreshFromApi = async () => {
+    const token = getStoredAccessToken();
+    const [seriesRows, tagRows, instanceRows] = await Promise.all([
+      fetchEventSeries(token),
+      fetchEventTags(token),
+      fetchEventInstances(token),
+    ]);
 
-    const newSeries = {
-      id: Math.floor(1000 + Math.random() * 9000),
-      ...createForm,
-      title: createForm.title.trim(),
-      location: createForm.location.trim(),
-      time: createForm.time.trim(),
-      recurrenceRule: createForm.recurrenceRule.trim(),
-      nextOccurrence: createForm.recurrenceType === "none" ? createForm.nextOccurrence : "",
-      registeredMemberIds: [],
-    };
-
-    setSeries((current) => [newSeries, ...current]);
-    setCreateForm(CREATE_INITIAL);
-    setCreateOpen(false);
+    setTags(tagRows);
+    setInstances(instanceRows);
+    setSeries(mapSeriesForUi(seriesRows, instanceRows));
   };
 
-  const handleCreateTag = (event) => {
+  const handleCreate = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+
+    try {
+      const token = getStoredAccessToken();
+      const created = await createEventSeries(token, buildSeriesPayload(createForm));
+      const oneTimeInstancePayload = buildOneTimeInstancePayload(created.id, createForm);
+
+      if (oneTimeInstancePayload) {
+        await createEventInstance(token, oneTimeInstancePayload);
+      }
+
+      await refreshFromApi();
+      setCreateForm({ ...CREATE_INITIAL });
+      setCreateOpen(false);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "Failed to create event series.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateTag = async (event) => {
     event.preventDefault();
 
     const name = tagForm.name.trim().toLowerCase();
@@ -237,14 +324,22 @@ export default function EventsPage() {
       return;
     }
 
-    const newTag = {
-      id: Math.floor(1000 + Math.random() * 9000),
-      name,
-      color: tagForm.color || "#4f86d9",
-    };
+    setSaving(true);
+    setError("");
 
-    setTags((current) => [newTag, ...current]);
-    setTagForm(TAG_INITIAL);
+    try {
+      const token = getStoredAccessToken();
+      await createEventTag(token, {
+        name,
+        color: tagForm.color || "#4f86d9",
+      });
+      await refreshFromApi();
+      setTagForm(TAG_INITIAL);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "Failed to create tag.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleSeriesTag = (tagId) => {
@@ -258,30 +353,39 @@ export default function EventsPage() {
     });
   };
 
-  const handleRemoveTag = (tagId) => {
+  const handleRemoveTag = async (tagId) => {
     const tagToRemove = tagsById[tagId];
     const confirmed = window.confirm(
-      `Remove tag "${tagToRemove?.name ?? "this tag"}"? This will also remove it from all series.`
+      `Remove tag "${tagToRemove?.name ?? "this tag"}"? This may fail if the tag is still linked to series.`
     );
 
     if (!confirmed) {
       return;
     }
 
-    setTags((current) => current.filter((tag) => tag.id !== tagId));
-    setSeries((current) =>
-      current.map((item) => ({
-        ...item,
-        tagIds: item.tagIds.filter((value) => value !== tagId),
-      }))
-    );
-    setCreateForm((current) => ({
-      ...current,
-      tagIds: current.tagIds.filter((value) => value !== tagId),
-    }));
+    setSaving(true);
+    setError("");
+
+    try {
+      const token = getStoredAccessToken();
+      await deleteEventTag(token, tagId);
+      await refreshFromApi();
+      setCreateForm((current) => ({
+        ...current,
+        tagIds: current.tagIds.filter((value) => value !== tagId),
+      }));
+      setFilters((current) => ({
+        ...current,
+        tagIds: current.tagIds.filter((value) => value !== tagId),
+      }));
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "Failed to remove tag.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleRemoveSelectedSeries = () => {
+  const handleRemoveSelectedSeries = async () => {
     if (!selectedSeries) {
       return;
     }
@@ -291,10 +395,20 @@ export default function EventsPage() {
       return;
     }
 
-    setSeries((current) => current.filter((item) => item.id !== selectedSeries.id));
-    setSelectedSeriesId(null);
-    setMemberSearch("");
-    setEditForm(null);
+    setSaving(true);
+    setError("");
+
+    try {
+      const token = getStoredAccessToken();
+      await deleteEventSeries(token, selectedSeries.id);
+      await refreshFromApi();
+      setSelectedSeriesId(null);
+      setEditForm(null);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "Failed to remove series.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleToggleEditTag = (tagId) => {
@@ -311,48 +425,25 @@ export default function EventsPage() {
     });
   };
 
-  const handleSaveSeries = (event) => {
+  const handleSaveSeries = async (event) => {
     event.preventDefault();
     if (!selectedSeries || !editForm) {
       return;
     }
 
-    const updatedSeries = {
-      ...selectedSeries,
-      ...editForm,
-      title: editForm.title.trim(),
-      location: editForm.location.trim(),
-      time: editForm.time.trim(),
-      recurrenceRule: editForm.recurrenceType === "none" ? "" : editForm.recurrenceRule.trim(),
-      nextOccurrence: editForm.nextOccurrence,
-    };
+    setSaving(true);
+    setError("");
 
-    setSeries((current) => current.map((item) => (item.id === selectedSeries.id ? updatedSeries : item)));
-    setEditForm(null);
-  };
-
-  const handleToggleMemberRegistration = (memberId) => {
-    if (!selectedSeries) {
-      return;
+    try {
+      const token = getStoredAccessToken();
+      await updateEventSeries(token, selectedSeries.id, buildSeriesPayload(editForm));
+      await refreshFromApi();
+      setEditForm(null);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "Failed to update series.");
+    } finally {
+      setSaving(false);
     }
-
-    setSeries((current) =>
-      current.map((item) => {
-        if (item.id !== selectedSeries.id) {
-          return item;
-        }
-
-        const registeredMemberIds = item.registeredMemberIds ?? [];
-        const isRegistered = registeredMemberIds.includes(memberId);
-
-        return {
-          ...item,
-          registeredMemberIds: isRegistered
-            ? registeredMemberIds.filter((value) => value !== memberId)
-            : [...registeredMemberIds, memberId],
-        };
-      })
-    );
   };
 
   return (
@@ -375,6 +466,9 @@ export default function EventsPage() {
         </div>
       </header>
 
+      {loading ? <p className="events-register-empty">Loading event series...</p> : null}
+      {error ? <p className="events-register-empty">{error}</p> : null}
+
       <div className="events-series-list" role="list" aria-label="Event series list">
         {filteredSeries.map((item) => (
           <article
@@ -384,14 +478,12 @@ export default function EventsPage() {
             tabIndex={0}
             onClick={() => {
               setSelectedSeriesId(item.id);
-              setMemberSearch("");
               setEditForm(null);
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 setSelectedSeriesId(item.id);
-                setMemberSearch("");
                 setEditForm(null);
               }
             }}
@@ -432,7 +524,7 @@ export default function EventsPage() {
 
             <p className="event-series-meta">
               <span>Time</span>
-              <strong>{item.time || "-"}</strong>
+              <strong>{formatTimeRange(item.startTime, item.endTime)}</strong>
             </p>
             <p className="event-series-meta">
               <span>Location</span>
@@ -602,11 +694,20 @@ export default function EventsPage() {
               ) : null}
 
               <label>
-                Time
+                Start Time
                 <input
-                  value={createForm.time}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, time: event.target.value }))}
-                  placeholder="e.g. 10:00 - 11:45"
+                  type="time"
+                  value={createForm.startTime}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, startTime: event.target.value }))}
+                />
+              </label>
+
+              <label>
+                End Time
+                <input
+                  type="time"
+                  value={createForm.endTime}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, endTime: event.target.value }))}
                 />
               </label>
 
@@ -620,7 +721,7 @@ export default function EventsPage() {
 
               {createForm.recurrenceType === "none" ? (
                 <label>
-                  Next Occurrence
+                  Date (for one-time instance)
                   <input
                     type="date"
                     value={createForm.nextOccurrence}
@@ -666,7 +767,7 @@ export default function EventsPage() {
                 </select>
               </label>
 
-              <button type="submit" className="members-primary-button">
+              <button type="submit" className="members-primary-button" disabled={saving}>
                 Save Series
               </button>
             </form>
@@ -679,7 +780,6 @@ export default function EventsPage() {
           className="members-drawer-backdrop events-modal-backdrop"
           onClick={() => {
             setSelectedSeriesId(null);
-            setMemberSearch("");
             setEditForm(null);
           }}
           role="presentation"
@@ -692,7 +792,6 @@ export default function EventsPage() {
                 className="members-text-button"
                 onClick={() => {
                   setSelectedSeriesId(null);
-                  setMemberSearch("");
                   setEditForm(null);
                 }}
               >
@@ -740,20 +839,24 @@ export default function EventsPage() {
                   </label>
                 ) : null}
                 <label>
-                  Time
-                  <input value={editForm.time} onChange={(event) => setEditForm((current) => ({ ...current, time: event.target.value }))} />
+                  Start Time
+                  <input
+                    type="time"
+                    value={editForm.startTime}
+                    onChange={(event) => setEditForm((current) => ({ ...current, startTime: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  End Time
+                  <input
+                    type="time"
+                    value={editForm.endTime}
+                    onChange={(event) => setEditForm((current) => ({ ...current, endTime: event.target.value }))}
+                  />
                 </label>
                 <label>
                   Location
                   <input value={editForm.location} onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))} />
-                </label>
-                <label>
-                  Next Occurrence
-                  <input
-                    type="date"
-                    value={editForm.nextOccurrence}
-                    onChange={(event) => setEditForm((current) => ({ ...current, nextOccurrence: event.target.value }))}
-                  />
                 </label>
                 <fieldset className="events-tag-picker">
                   <legend>Tags</legend>
@@ -786,7 +889,7 @@ export default function EventsPage() {
                     <option value="completed">completed</option>
                   </select>
                 </label>
-                <button type="submit" className="members-primary-button">
+                <button type="submit" className="members-primary-button" disabled={saving}>
                   Save Changes
                 </button>
               </form>
@@ -814,7 +917,7 @@ export default function EventsPage() {
                 </p>
                 <p className="events-detail-item" role="listitem">
                   <span>Time</span>
-                  <strong>{selectedSeries.time || "-"}</strong>
+                  <strong>{formatTimeRange(selectedSeries.startTime, selectedSeries.endTime)}</strong>
                 </p>
                 <p className="events-detail-item" role="listitem">
                   <span>Location</span>
@@ -823,6 +926,10 @@ export default function EventsPage() {
                 <p className="events-detail-item" role="listitem">
                   <span>Next Occurrence</span>
                   <strong>{formatDate(selectedSeries.nextOccurrence)}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Instances</span>
+                  <strong>{selectedSeries.instanceCount}</strong>
                 </p>
                 <div className="events-detail-item" role="listitem">
                   <span>Tags</span>
@@ -852,59 +959,6 @@ export default function EventsPage() {
               </div>
             )}
 
-            {selectedSeries.attendanceType === "individual" ? (
-              <div className="events-register-panel">
-                <div className="events-register-panel-head">
-                  <div>
-                    <h3>Register Members</h3>
-                  </div>
-
-                  <p className="events-register-count">{selectedSeriesRegisteredMemberIds.length} registered</p>
-                </div>
-
-                <label className="events-register-search">
-                  Search members
-                  <input
-                    value={memberSearch}
-                    onChange={(event) => setMemberSearch(event.target.value)}
-                    placeholder="Name or family"
-                  />
-                </label>
-
-                <div className="events-register-list" role="list" aria-label="Member registration list">
-                  {filteredMembers.length ? (
-                    filteredMembers.map((member) => {
-                      const isRegistered = selectedSeriesRegisteredMemberIds.includes(member.id);
-
-                      return (
-                        <div key={member.id} className="events-register-row" role="listitem">
-                          <div className="events-register-row-main">
-                            <strong>{member.name}</strong>
-                            <span>{member.family}</span>
-                          </div>
-
-                          <div className="events-register-row-actions">
-                            <span className={`events-register-pill ${isRegistered ? "events-register-pill-active" : ""}`}>
-                              {isRegistered ? "Registered" : "Not registered"}
-                            </span>
-                            <button
-                              type="button"
-                              className={isRegistered ? "events-tag-remove-button" : "members-secondary-button"}
-                              onClick={() => handleToggleMemberRegistration(member.id)}
-                            >
-                              {isRegistered ? "Unregister" : "Register"}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="events-register-empty">No members match your search.</p>
-                  )}
-                </div>
-              </div>
-            ) : null}
-
             <div className="detail-modal-actions">
               {editForm ? (
                 <button type="button" className="members-secondary-button" onClick={() => setEditForm(null)}>
@@ -915,7 +969,7 @@ export default function EventsPage() {
                   Edit Series
                 </button>
               )}
-              <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedSeries}>
+              <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedSeries} disabled={saving}>
                 Remove Series
               </button>
             </div>
@@ -961,7 +1015,7 @@ export default function EventsPage() {
                   />
                 </label>
 
-                <button type="submit" className="members-secondary-button">
+                <button type="submit" className="members-secondary-button" disabled={saving}>
                   Add Tag
                 </button>
               </form>
@@ -982,7 +1036,7 @@ export default function EventsPage() {
                       <span className="events-tag-pill" style={{ borderColor: tag.color, color: tag.color }}>
                         {tag.name}
                       </span>
-                      <button type="button" className="events-tag-remove-button" onClick={() => handleRemoveTag(tag.id)}>
+                      <button type="button" className="events-tag-remove-button" onClick={() => handleRemoveTag(tag.id)} disabled={saving}>
                         Remove
                       </button>
                     </div>

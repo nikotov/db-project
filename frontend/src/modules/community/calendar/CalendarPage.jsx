@@ -1,64 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import {
+  deleteEventInstance,
+  fetchEventInstances,
+  fetchEventSeries,
+  getStoredAccessToken,
+} from "../../../api/client";
+
 const SLOT_START_HOUR = 0;
 const SLOT_END_HOUR = 24;
 const HOUR_HEIGHT = 72;
 const TIMELINE_VERTICAL_PADDING = 24;
-
-const MOCK_EVENT_INSTANCES = [
-  {
-    id: 1,
-    dayOffset: 0,
-    startHour: 19,
-    startMinute: 0,
-    durationMinutes: 90,
-    seriesName: "Young Adults Small Group",
-    attendanceType: "individual",
-    location: "Room 204",
-    expected_attendees: 18,
-    tags: [
-      { name: "youth", color: "#7c5cff" },
-      { name: "church", color: "#4f86d9" },
-    ],
-  },
-  {
-    id: 2,
-    dayOffset: 2,
-    startHour: 20,
-    startMinute: 15,
-    durationMinutes: 75,
-    seriesName: "Leaders Planning Meeting",
-    attendanceType: "general",
-    location: "Conference Room A",
-    expected_attendees: 9,
-    tags: [{ name: "church", color: "#4f86d9" }],
-  },
-  {
-    id: 3,
-    dayOffset: 4,
-    startHour: 19,
-    startMinute: 30,
-    durationMinutes: 120,
-    seriesName: "Neighborhood Prayer Night",
-    attendanceType: "general",
-    location: "Prayer Hall",
-    expected_attendees: 32,
-    tags: [{ name: "prayer", color: "#2f9e7a" }],
-  },
-  {
-    id: 4,
-    dayOffset: 6,
-    startHour: 10,
-    startMinute: 0,
-    durationMinutes: 90,
-    seriesName: "Sunday Service",
-    attendanceType: "individual",
-    location: "Main Auditorium",
-    expected_attendees: 185,
-    tags: [{ name: "church", color: "#4f86d9" }],
-  },
-];
 
 function startOfWeek(date) {
   const value = new Date(date);
@@ -77,41 +30,8 @@ function addDays(date, days) {
   return value;
 }
 
-function addMinutes(date, minutes) {
-  const value = new Date(date);
-  value.setMinutes(value.getMinutes() + minutes);
-  return value;
-}
-
 function formatDateKey(value) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
-}
-
-function createDateAtHour(baseDate, hour, minute = 0) {
-  const value = new Date(baseDate);
-  value.setHours(hour, minute, 0, 0);
-  return value;
-}
-
-function buildMockWeekEvents(weekStart, instances) {
-  return instances.map((template) => {
-    const eventDate = addDays(weekStart, template.dayOffset);
-    const startDatetime = createDateAtHour(eventDate, template.startHour, template.startMinute);
-    const endDatetime = addMinutes(startDatetime, template.durationMinutes);
-
-    return {
-      event_instance: {
-        id: template.id,
-        series_name: template.seriesName,
-        start_datetime: startDatetime.toISOString(),
-        end_datetime: endDatetime.toISOString(),
-        attendance_type: template.attendanceType,
-        location: template.location,
-        attendee_count: template.expected_attendees,
-        tags: template.tags,
-      },
-    };
-  });
 }
 
 function formatDate(value, options) {
@@ -148,12 +68,79 @@ function formatDateTime(value) {
   });
 }
 
+function mapInstancesForCalendar(instancesRows, seriesRows) {
+  const seriesById = Object.fromEntries(seriesRows.map((series) => [series.id, series]));
+
+  return instancesRows.map((row) => {
+    const series = seriesById[row.event_series_id];
+
+    return {
+      id: row.id,
+      series_name: series?.name ?? `Series #${row.event_series_id}`,
+      start_datetime: row.start_datetime,
+      end_datetime: row.end_datetime,
+      attendance_type: series?.attendance_type ?? "general",
+      location: row.location ?? series?.location ?? "",
+      attendee_count: row.attendee_count ?? 0,
+      tags: (series?.tags ?? []).map((tag) => ({ name: tag.name, color: tag.color || "#4f86d9" })),
+    };
+  });
+}
+
 export default function CalendarPage() {
   const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [eventInstances, setEventInstances] = useState(MOCK_EVENT_INSTANCES);
+  const [eventInstances, setEventInstances] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const schedulerScrollRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadData() {
+      const token = getStoredAccessToken();
+      if (!token) {
+        if (active) {
+          setError("Missing access token. Please sign in again.");
+          setLoading(false);
+        }
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const [instanceRows, seriesRows] = await Promise.all([
+          fetchEventInstances(token),
+          fetchEventSeries(token),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setEventInstances(mapInstancesForCalendar(instanceRows, seriesRows));
+        setError("");
+      } catch (exception) {
+        if (active) {
+          setError(exception instanceof Error ? exception.message : "Failed to load calendar instances.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
@@ -184,29 +171,26 @@ export default function CalendarPage() {
       return;
     }
 
-    // Default viewport around 8-10 AM by anchoring near 9 AM.
     const targetHour = 9;
-    const targetTop =
-      TIMELINE_VERTICAL_PADDING + (targetHour - SLOT_START_HOUR) * HOUR_HEIGHT;
+    const targetTop = TIMELINE_VERTICAL_PADDING + (targetHour - SLOT_START_HOUR) * HOUR_HEIGHT;
 
     scroller.scrollTop = Math.max(0, targetTop - scroller.clientHeight * 0.2);
   }, []);
 
   const weekEventsByDayIndex = useMemo(() => {
-    const events = buildMockWeekEvents(weekStart, eventInstances);
-
     const dayIndexByKey = Object.fromEntries(weekDays.map((day, index) => [formatDateKey(day), index]));
 
-    return events.reduce((acc, event) => {
-      const start = new Date(event.event_instance.start_datetime);
+    return eventInstances.reduce((acc, instance) => {
+      const start = new Date(instance.start_datetime);
+      const end = new Date(instance.end_datetime);
       const dayIndex = dayIndexByKey[formatDateKey(start)];
 
-      if (dayIndex === undefined) {
+      if (dayIndex === undefined || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
         return acc;
       }
 
       const startMinutes = getMinutesFromDate(start);
-      const endMinutes = getMinutesFromDate(new Date(event.event_instance.end_datetime));
+      const endMinutes = getMinutesFromDate(end);
       const durationMinutes = Math.max(30, endMinutes - startMinutes);
       const top = ((startMinutes - dayStartMinutes) / 60) * HOUR_HEIGHT + TIMELINE_VERTICAL_PADDING;
       const height = Math.max(28, (durationMinutes / 60) * HOUR_HEIGHT);
@@ -216,7 +200,7 @@ export default function CalendarPage() {
       }
 
       acc[dayIndex].push({
-        ...event,
+        event_instance: instance,
         _layout: {
           top,
           height,
@@ -229,7 +213,7 @@ export default function CalendarPage() {
     }, {});
   }, [dayStartMinutes, eventInstances, weekDays]);
 
-  const handleRemoveSelectedEvent = () => {
+  const handleRemoveSelectedEvent = async () => {
     if (!selectedEvent) {
       return;
     }
@@ -241,8 +225,19 @@ export default function CalendarPage() {
       return;
     }
 
-    setEventInstances((current) => current.filter((item) => item.id !== selectedEvent.id));
-    setSelectedEvent(null);
+    setSaving(true);
+    setError("");
+
+    try {
+      const token = getStoredAccessToken();
+      await deleteEventInstance(token, selectedEvent.id);
+      setEventInstances((current) => current.filter((item) => item.id !== selectedEvent.id));
+      setSelectedEvent(null);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "Failed to remove event instance.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -270,6 +265,9 @@ export default function CalendarPage() {
           </button>
         </div>
       </header>
+
+      {loading ? <p className="events-register-empty">Loading calendar...</p> : null}
+      {error ? <p className="events-register-empty">{error}</p> : null}
 
       <section className="week-scheduler">
         <div className="week-scheduler-scroll" ref={schedulerScrollRef}>
@@ -426,7 +424,7 @@ export default function CalendarPage() {
               >
                 Register Attendance
               </button>
-              <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedEvent}>
+              <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedEvent} disabled={saving}>
                 Remove Instance
               </button>
             </div>
