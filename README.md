@@ -11,8 +11,6 @@ Starter structure for a class final project using PostgreSQL.
 - `db/seeds/`: Development/test seed data.
 - `db/scripts/`: Helper scripts for local DB workflows.
 - `schema_final.sql`: Original DER export file (MySQL Workbench format).
-- `docs/`: Requirement notes and architecture decisions.
-- `tests/db/`: DB-focused test notes and future integration tests.
 
 Backend note:
 - `backend/` follows hexagonal architecture (`domain/`, `ports/`, `adapters/`) and uses Alembic for migrations.
@@ -46,7 +44,7 @@ pip install -r requirements.txt
 ```
 
 
-### 3. Add seeded dev data
+### 4. Add seeded dev data
 
 ```bash
 cd ..
