@@ -1,5 +1,5 @@
 """HTTP schemas for event-series, event-instance and event-tag routes."""
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -56,6 +56,13 @@ class EventSeriesResponse(BaseModel):
 
 
 # Event Instance 
+
+# Generate Instances
+
+class EventSeriesGenerateInstancesRequest(BaseModel):
+    from_date: date
+    to_date: date
+
 
 class EventInstanceCreate(BaseModel):
     event_series_id: int = Field(ge=1)
