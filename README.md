@@ -39,10 +39,18 @@ cd db-project
 docker compose up --build
 ```
 
+### 3. Install Python dependencies
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+
 ### 3. Add seeded dev data
 
 ```bash
-./db/scripts/reset_dev.sh
+cd ..
+bash db/scripts/reset_dev.sh
 ```
 
 
