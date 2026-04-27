@@ -24,17 +24,27 @@ The active PostgreSQL schema migration path is Alembic in `backend/alembic/versi
 
 ## Quick start
 
-1. Copy environment variables:
-   - Create `.env` with at least:
-     - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`
-     - `JWT_SECRET_KEY`
-     - `CORS_ALLOW_ORIGINS`
-2. Start PostgreSQL:
-   - `docker compose up -d`
-3. Apply DB schema migrations:
-   - `cd backend && alembic upgrade head`
-4. Check logs:
-   - `docker compose logs -f postgres`
+Follow these steps to set up and run the project locally.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/nikotov/db-project.git
+cd db-project
+```
+
+### 2. Start containers
+
+```bash
+docker compose up --build
+```
+
+### 3. Add seeded dev data
+
+```bash
+./db/scripts/reset_dev.sh
+```
+
 
 ## One-command verification
 
@@ -45,13 +55,4 @@ Run an end-to-end local verification (build, DB health, migration log check, aut
 Note:
 - On first startup (empty volume), Docker will only run minimal bootstrap scripts in `db/init/`.
 - Schema changes are applied through Alembic only.
-- If you need to reinitialize local DB state:
-   - `docker compose down -v && docker compose up -d`
-   - `cd backend && alembic upgrade head`
-
-## Suggested first milestones
-
-1. Create schema revisions in `backend/alembic/versions/`.
-2. Add seed data in `db/seeds/001_seed_dev.sql`.
-3. Implement backend use cases in `backend/app/domain/` and adapters in `backend/app/adapters/`.
-4. Apply DB migrations with Alembic.
+- If you need to reinitialize local DB state, run reset_dev.sh script
