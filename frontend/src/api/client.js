@@ -168,6 +168,13 @@ export async function deleteEventInstance(token, instanceId) {
     });
 }
 
+export async function generateEventInstances(token, seriesId, fromDate, toDate) {
+    return apiFetch(`/event-series/${seriesId}/generate-instances`, token, {
+        method: "POST",
+        body: JSON.stringify({ from_date: fromDate, to_date: toDate }),
+    });
+}
+
 // Event Tags
 export const fetchEventTags = (token) => apiFetch("/event-tags", token);
 export async function createEventTag(token, payload) {

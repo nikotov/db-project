@@ -9,6 +9,7 @@ import {
   fetchEventInstances,
   fetchEventSeries,
   fetchEventTags,
+  generateEventInstances,
   getStoredAccessToken,
   updateEventSeries,
 } from "../../../api/client";
@@ -30,6 +31,8 @@ const CREATE_INITIAL = {
   location: "",
   status: "active",
   nextOccurrence: "",
+  generateFromDate: "",
+  generateToDate: "",
   tagIds: [],
 };
 
@@ -300,10 +303,21 @@ export default function EventsPage() {
     try {
       const token = getStoredAccessToken();
       const created = await createEventSeries(token, buildSeriesPayload(createForm));
-      const oneTimeInstancePayload = buildOneTimeInstancePayload(created.id, createForm);
 
-      if (oneTimeInstancePayload) {
-        await createEventInstance(token, oneTimeInstancePayload);
+      if (createForm.recurrenceType === "none") {
+        // One-time series: create a single instance from the date field
+        const oneTimeInstancePayload = buildOneTimeInstancePayload(created.id, createForm);
+        if (oneTimeInstancePayload) {
+          await createEventInstance(token, oneTimeInstancePayload);
+        }
+      } else if (createForm.generateFromDate && createForm.generateToDate) {
+        // Recurring series: generate instances for the specified date range
+        await generateEventInstances(
+          token,
+          created.id,
+          createForm.generateFromDate,
+          createForm.generateToDate,
+        );
       }
 
       await refreshFromApi();
@@ -728,7 +742,30 @@ export default function EventsPage() {
                     onChange={(event) => setCreateForm((current) => ({ ...current, nextOccurrence: event.target.value }))}
                   />
                 </label>
-              ) : null}
+              ) : (
+                <fieldset style={{ border: "1px solid var(--color-border)", borderRadius: "6px", padding: "12px" }}>
+                  <legend style={{ fontWeight: 600, padding: "0 6px" }}>Generate instances (optional)</legend>
+                  <p style={{ marginTop: 0, fontSize: "0.85rem", color: "var(--color-text-muted, #888)" }}>
+                    Automatically create instances for this recurring series between two dates.
+                  </p>
+                  <label>
+                    From date
+                    <input
+                      type="date"
+                      value={createForm.generateFromDate}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, generateFromDate: event.target.value }))}
+                    />
+                  </label>
+                  <label style={{ marginTop: "8px" }}>
+                    To date
+                    <input
+                      type="date"
+                      value={createForm.generateToDate}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, generateToDate: event.target.value }))}
+                    />
+                  </label>
+                </fieldset>
+              )}
 
               <fieldset className="events-tag-picker">
                 <legend>Tags</legend>
