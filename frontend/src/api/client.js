@@ -197,3 +197,24 @@ export const fetchMemberAttendance = (token, instanceId) =>
 export const fetchUserLogs = (token, params = "") =>
     apiFetch(`/user-logs${params}`, token);
 export const fetchMyLogs = (token) => apiFetch("/user-logs/me", token);
+
+// Users
+export const fetchUsers = (token, params = "") =>
+    apiFetch(`/users${params}`, token);
+export async function createUser(token, payload) {
+    return apiFetch("/users", token, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+export async function updateUser(token, userId, payload) {
+    return apiFetch(`/users/${userId}`, token, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+}
+export async function deleteUser(token, userId) {
+    return apiFetch(`/users/${userId}`, token, {
+        method: "DELETE",
+    });
+}

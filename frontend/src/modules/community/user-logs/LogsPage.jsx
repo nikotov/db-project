@@ -1,52 +1,16 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const MOCK_USERS = [
-  {
-    id: 1,
-    username: "admin",
-    last_login: "2026-04-25T08:14:00",
-    password: "admin123",
-  },
-  {
-    id: 2,
-    username: "mlopez",
-    last_login: "2026-04-25T09:20:00",
-    password: "mlopez123",
-  },
-  {
-    id: 3,
-    username: "jcastro",
-    last_login: "2026-04-24T18:42:00",
-    password: "jcastro123",
-  },
-];
+import {
+  createUser,
+  deleteUser,
+  fetchUserLogs,
+  fetchUsers,
+  getStoredAccessToken,
+  updateUser,
+} from "../../../api/client";
 
-const MOCK_USER_LOGS = [
-  {
-    username: "admin",
-    action_type: "login",
-    description: "Successful login from web client",
-    created_at: "2026-04-25T08:14:00",
-  },
-  {
-    username: "admin",
-    action_type: "create_event_series",
-    description: "Created event series: Young Adults Gathering",
-    created_at: "2026-04-25T08:26:00",
-  },
-  {
-    username: "mlopez",
-    action_type: "update_member",
-    description: "Updated member profile: Mariana Lopez",
-    created_at: "2026-04-25T09:03:00",
-  },
-  {
-    username: "mlopez",
-    action_type: "save_attendance",
-    description: "Saved attendance for Sunday Service instance",
-    created_at: "2026-04-25T09:20:00",
-  },
-];
+const MOCK_USERS = [];
+const MOCK_USER_LOGS = [];
 
 const NEW_USER_INITIAL = {
   username: "",
@@ -72,26 +36,8 @@ function formatDateTime(value) {
   });
 }
 
-function toDateTimeLocalValue(value) {
-  if (!value) {
-    return "";
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  const hours = String(parsed.getHours()).padStart(2, "0");
-  const minutes = String(parsed.getMinutes()).padStart(2, "0");
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-export default function LogsPage() {
+export default function LogsPage({ token: providedToken }) {
+  const token = providedToken || getStoredAccessToken();
   const [view, setView] = useState("users");
   const [users, setUsers] = useState(MOCK_USERS);
   const [logs, setLogs] = useState(MOCK_USER_LOGS);
@@ -99,8 +45,40 @@ export default function LogsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleAddUser = (event) => {
+  const usersById = useMemo(
+    () => Object.fromEntries(users.map((user) => [user.id, user])),
+    [users]
+  );
+
+  async function loadData() {
+    if (!token) {
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const [usersPayload, logsPayload] = await Promise.all([
+        fetchUsers(token),
+        fetchUserLogs(token),
+      ]);
+      setUsers(usersPayload || []);
+      setLogs(logsPayload || []);
+    } catch (err) {
+      setError(err?.message || "Failed to load users/logs.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const handleAddUser = async (event) => {
     event.preventDefault();
 
     const username = newUser.username.trim().toLowerCase();
@@ -109,53 +87,38 @@ export default function LogsPage() {
       return;
     }
 
-    const usernameExists = users.some((user) => user.username.toLowerCase() === username);
-    if (usernameExists) {
-      window.alert("Username already exists.");
-      return;
-    }
-
-    const createdAt = new Date().toISOString();
-    const userToAdd = {
-      id: Math.floor(1000 + Math.random() * 9000),
-      username,
-      last_login: null,
-      password,
-    };
-
-    setUsers((current) => [userToAdd, ...current]);
-    setLogs((current) => [
-      {
+    setError("");
+    try {
+      const created = await createUser(token, {
         username,
-        action_type: "create_user",
-        description: `Created user account: ${username}`,
-        created_at: createdAt,
-      },
-      ...current,
-    ]);
-    setNewUser(NEW_USER_INITIAL);
-    setAddOpen(false);
+        password,
+        role: "member",
+      });
+      setUsers((current) => [created, ...current]);
+      setNewUser(NEW_USER_INITIAL);
+      setAddOpen(false);
+      await loadData();
+    } catch (err) {
+      setError(err?.message || "Could not create user.");
+    }
   };
 
-  const handleRemoveUser = (userToRemove) => {
+  const handleRemoveUser = async (userToRemove) => {
     const confirmed = window.confirm(`Remove user "${userToRemove.username}"? This action cannot be undone.`);
     if (!confirmed) {
       return;
     }
 
-    const removedAt = new Date().toISOString();
-    setUsers((current) => current.filter((user) => user.id !== userToRemove.id));
-    setLogs((current) => [
-      {
-        username: "admin",
-        action_type: "remove_user",
-        description: `Removed user account: ${userToRemove.username}`,
-        created_at: removedAt,
-      },
-      ...current,
-    ]);
-    setSelectedUser(null);
-    setEditForm(null);
+    setError("");
+    try {
+      await deleteUser(token, userToRemove.id);
+      setUsers((current) => current.filter((user) => user.id !== userToRemove.id));
+      setSelectedUser(null);
+      setEditForm(null);
+      await loadData();
+    } catch (err) {
+      setError(err?.message || "Could not delete user.");
+    }
   };
 
   const handleOpenEdit = (user) => {
@@ -163,48 +126,39 @@ export default function LogsPage() {
     setEditForm({
       username: user.username,
       password: "",
+      role: user.role || "member",
     });
   };
 
-  const handleSaveUser = (event) => {
+  const handleSaveUser = async (event) => {
     event.preventDefault();
     if (!selectedUser || !editForm) {
       return;
     }
 
     const username = editForm.username.trim().toLowerCase();
-    const password = editForm.password.trim();
     if (!username) {
       return;
     }
 
-    const duplicateUsername = users.some(
-      (user) => user.id !== selectedUser.id && user.username.toLowerCase() === username
-    );
-    if (duplicateUsername) {
-      window.alert("Username already exists.");
-      return;
+    setError("");
+    try {
+      const payload = {
+        username,
+        role: editForm.role || "member",
+      };
+      const trimmedPassword = editForm.password.trim();
+      if (trimmedPassword) {
+        payload.password = trimmedPassword;
+      }
+      const updated = await updateUser(token, selectedUser.id, payload);
+      setUsers((current) => current.map((user) => (user.id === selectedUser.id ? updated : user)));
+      setSelectedUser(updated);
+      setEditForm(null);
+      await loadData();
+    } catch (err) {
+      setError(err?.message || "Could not update user.");
     }
-
-    const updatedUser = {
-      ...selectedUser,
-      username,
-      password: password || selectedUser.password,
-    };
-
-    const updatedAt = new Date().toISOString();
-    setUsers((current) => current.map((user) => (user.id === selectedUser.id ? updatedUser : user)));
-    setLogs((current) => [
-      {
-        username: "admin",
-        action_type: "update_user",
-        description: `Updated user account: ${selectedUser.username} -> ${username}`,
-        created_at: updatedAt,
-      },
-      ...current,
-    ]);
-    setSelectedUser(updatedUser);
-    setEditForm(null);
   };
 
   return (
@@ -235,6 +189,7 @@ export default function LogsPage() {
           ) : null}
         </div>
       </header>
+      {error ? <p className="events-register-empty">{error}</p> : null}
 
       {view === "users" ? (
         <section className="user-management-card user-management-card-full" aria-label="User management">
@@ -244,7 +199,9 @@ export default function LogsPage() {
           </div>
 
           <div className="user-management-list" role="list" aria-label="Created users list">
-            {users.length ? (
+            {loading ? (
+              <p className="events-register-empty">Loading users...</p>
+            ) : users.length ? (
               users.map((user) => (
                 <article key={user.id} className="user-management-row" role="listitem">
                   <button type="button" className="user-management-row-main user-row-button" onClick={() => handleOpenEdit(user)}>
@@ -285,8 +242,8 @@ export default function LogsPage() {
               </thead>
               <tbody>
                 {logs.map((log, index) => (
-                  <tr key={`${log.username}-${log.created_at}-${index}`}>
-                    <td>{log.username}</td>
+                  <tr key={`${log.user_id}-${log.created_at}-${index}`}>
+                    <td>{usersById[log.user_id]?.username || `user#${log.user_id}`}</td>
                     <td>{log.action_type}</td>
                     <td>{log.description || "-"}</td>
                     <td>{formatDateTime(log.created_at)}</td>
@@ -380,6 +337,16 @@ export default function LogsPage() {
                     placeholder="Leave blank to keep current password"
                   />
                 </label>
+                <label>
+                  Role
+                  <select
+                    value={editForm.role}
+                    onChange={(event) => setEditForm((current) => ({ ...current, role: event.target.value }))}
+                  >
+                    <option value="member">member</option>
+                    <option value="admin">admin</option>
+                  </select>
+                </label>
                 <button type="submit" className="members-primary-button">
                   Save Changes
                 </button>
@@ -393,6 +360,10 @@ export default function LogsPage() {
                 <p className="members-detail-item" role="listitem">
                   <span>Last Login</span>
                   <strong>{formatDateTime(selectedUser.last_login)}</strong>
+                </p>
+                <p className="members-detail-item" role="listitem">
+                  <span>Role</span>
+                  <strong>{selectedUser.role || "member"}</strong>
                 </p>
               </div>
             )}

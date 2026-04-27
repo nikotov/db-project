@@ -13,6 +13,7 @@ from app.adapters.input.http.routes import (
     families,
     member_status,
     user_logs,
+    users,
 )
 
 router = APIRouter()
@@ -41,3 +42,4 @@ router.include_router(member_status.router)
 
 # Admin / audit
 router.include_router(user_logs.router)
+router.include_router(users.router)
