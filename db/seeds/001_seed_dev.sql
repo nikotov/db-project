@@ -94,6 +94,66 @@ WHERE NOT EXISTS (
 	SELECT 1 FROM member m WHERE m.email = source.email
 );
 
+-- Small Groups
+INSERT INTO small_group (
+	name,
+	description,
+	meeting_day,
+	meeting_time,
+	location,
+	status
+)
+VALUES
+	('Northside Young Adults', 'Weekly group for university students and early-career adults.', 'Friday', '19:00', 'Room B-2', 'active'),
+	('City Families Circle', 'Family-focused discipleship and prayer community.', 'Sunday', '17:30', 'Main Campus - Family Hall', 'active'),
+	('Downtown Discipleship', 'Midweek discipleship group for new believers.', 'Wednesday', '18:30', 'Avenida Central 241', 'paused'),
+	('Prayer Watch', 'Weekly intercession and prayer watch for the congregation.', 'Tuesday', '20:00', 'Prayer Room', 'active')
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO small_group_tag (name, color)
+VALUES
+	('youth', '#7c5cff'),
+	('families', '#2f9e7a'),
+	('discipleship', '#4f86d9'),
+	('prayer', '#e08a2e'),
+	('community', '#d96b5f')
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO small_group_tag_map (small_group_id, tag_id)
+SELECT sg.id, sgt.id
+FROM (
+	VALUES
+		('Northside Young Adults', 'youth'),
+		('Northside Young Adults', 'discipleship'),
+		('City Families Circle', 'families'),
+		('City Families Circle', 'community'),
+		('Downtown Discipleship', 'discipleship'),
+		('Prayer Watch', 'prayer')
+) AS source(group_name, tag_name)
+JOIN small_group sg ON sg.name = source.group_name
+JOIN small_group_tag sgt ON sgt.name = source.tag_name
+ON CONFLICT (small_group_id, tag_id) DO NOTHING;
+
+INSERT INTO group_membership (member_id, small_group_id, role)
+SELECT m.id, sg.id, source.role::group_membership_status_enum
+FROM (
+	VALUES
+		('daniel.gomez@example.com', 'Northside Young Adults', 'leader'),
+		('samuel.ortiz@example.com', 'Northside Young Adults', 'member'),
+		('mariana.lopez@example.com', 'City Families Circle', 'leader'),
+		('camila.rivera@example.com', 'City Families Circle', 'member'),
+		('elena.vega@example.com', 'Prayer Watch', 'leader'),
+		('samuel.ortiz@example.com', 'Downtown Discipleship', 'member')
+) AS source(member_email, group_name, role)
+JOIN member m ON m.email = source.member_email
+JOIN small_group sg ON sg.name = source.group_name
+WHERE NOT EXISTS (
+	SELECT 1
+	FROM group_membership gm
+	WHERE gm.member_id = m.id
+	  AND gm.small_group_id = sg.id
+);
+
 -- Event tags
 INSERT INTO event_tag (name, color)
 VALUES
