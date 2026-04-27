@@ -1,62 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const MOCK_GROUP_TAGS = [
-  { id: 1, name: "youth", color: "#7c5cff" },
-  { id: 2, name: "families", color: "#2f9e7a" },
-  { id: 3, name: "discipleship", color: "#4f86d9" },
-  { id: 4, name: "prayer", color: "#e08a2e" },
-];
+import {
+  createGroupMembership,
+  createSmallGroup,
+  createSmallGroupTag,
+  deleteGroupMembership,
+  deleteSmallGroup,
+  deleteSmallGroupTag,
+  fetchFamilies,
+  fetchGroupMemberships,
+  fetchMembers,
+  fetchSmallGroupTags,
+  fetchSmallGroups,
+  getStoredAccessToken,
+  updateSmallGroup,
+} from "../../../api/client";
 
-const MOCK_SMALL_GROUPS = [
-  {
-    id: 1,
-    name: "Northside Young Adults",
-    location: "Room B-2",
-    meetingDay: "Friday",
-    meetingTime: "7:00 PM - 8:30 PM",
-    tagIds: [1, 3],
-    status: "active",
-    registeredMembers: [
-      { memberId: 1, status: "member" },
-      { memberId: 3, status: "leader" },
-    ],
-  },
-  {
-    id: 2,
-    name: "City Families Circle",
-    location: "Main Campus - Family Hall",
-    meetingDay: "Sunday",
-    meetingTime: "5:30 PM - 7:00 PM",
-    tagIds: [2, 4],
-    status: "active",
-    registeredMembers: [
-      { memberId: 2, status: "member" },
-      { memberId: 4, status: "member" },
-      { memberId: 5, status: "unknown" },
-    ],
-  },
-  {
-    id: 3,
-    name: "Downtown Discipleship",
-    location: "Avenida Central 241",
-    meetingDay: "Wednesday",
-    meetingTime: "6:30 PM - 8:00 PM",
-    tagIds: [3],
-    status: "paused",
-    registeredMembers: [{ memberId: 6, status: "leader" }],
-  },
-];
-
-const MOCK_MEMBERS = [
-  { id: 1, name: "Daniel Gomez", family: "Gomez Family" },
-  { id: 2, name: "Mariana Lopez", family: "Lopez Family" },
-  { id: 3, name: "Samuel Ortiz", family: "Ortiz Family" },
-  { id: 4, name: "Elena Vega", family: "Vega Family" },
-  { id: 5, name: "Camila Rivera", family: "Rivera Family" },
-  { id: 6, name: "Jorge Mendez", family: "Mendez Family" },
-];
-
-const MEMBER_STATUS_OPTIONS = ["member", "leader", "unknown"];
+const DAY_OPTIONS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const STATUS_OPTIONS = ["active", "paused"];
+const ROLE_OPTIONS = ["member", "leader", "unknown"];
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -65,86 +27,121 @@ const DEFAULT_FILTERS = {
   tagIds: [],
 };
 
-const CREATE_INITIAL = {
+const GROUP_FORM_INITIAL = {
   name: "",
-  location: "",
+  description: "",
   meetingDay: "Monday",
   meetingTime: "",
+  location: "",
   status: "active",
   tagIds: [],
 };
 
-function groupToForm(group) {
-  if (!group) {
-    return CREATE_INITIAL;
-  }
-
-  return {
-    name: group.name ?? "",
-    location: group.location ?? "",
-    meetingDay: group.meetingDay ?? "Monday",
-    meetingTime: group.meetingTime ?? "",
-    status: group.status ?? "active",
-    tagIds: group.tagIds ?? [],
-  };
-}
-
-const TAG_INITIAL = {
+const TAG_FORM_INITIAL = {
   name: "",
   color: "#4f86d9",
 };
 
-function createGroupId() {
-  return Math.floor(1000 + Math.random() * 9000);
+function normalizeTimeValue(value) {
+  if (!value) {
+    return "";
+  }
+
+  return value.length >= 5 ? value.slice(0, 5) : value;
+}
+
+function formatMemberName(member) {
+  if (!member) {
+    return "Unknown member";
+  }
+
+  return [member.name, member.last_name_parental, member.last_name_maternal].filter(Boolean).join(" ");
+}
+
+function formatFamilyName(member, familiesById) {
+  return familiesById[member.family_id]?.name ?? "No family";
+}
+
+function groupToForm(group) {
+  if (!group) {
+    return GROUP_FORM_INITIAL;
+  }
+
+  return {
+    name: group.name ?? "",
+    description: group.description ?? "",
+    meetingDay: group.meetingDay ?? "Monday",
+    meetingTime: normalizeTimeValue(group.meetingTime ?? ""),
+    location: group.location ?? "",
+    status: group.status ?? "active",
+    tagIds: (group.tags ?? []).map((tag) => tag.id),
+  };
+}
+
+function groupPayloadFromForm(form) {
+  return {
+    name: form.name.trim(),
+    description: form.description.trim() || null,
+    meeting_day: form.meetingDay,
+    meeting_time: form.meetingTime,
+    location: form.location.trim() || null,
+    status: form.status,
+    tag_ids: form.tagIds,
+  };
 }
 
 export default function SmallGroupsPage() {
-  const [groups, setGroups] = useState(MOCK_SMALL_GROUPS);
-  const [tags, setTags] = useState(MOCK_GROUP_TAGS);
+  const [groups, setGroups] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [families, setFamilies] = useState([]);
+  const [memberships, setMemberships] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
-  const [memberSearch, setMemberSearch] = useState("");
-  const [memberStatusDrafts, setMemberStatusDrafts] = useState({});
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [createForm, setCreateForm] = useState(CREATE_INITIAL);
-  const [tagForm, setTagForm] = useState(TAG_INITIAL);
+  const [createForm, setCreateForm] = useState(GROUP_FORM_INITIAL);
   const [editForm, setEditForm] = useState(null);
+  const [tagForm, setTagForm] = useState(TAG_FORM_INITIAL);
+  const [memberRoleDrafts, setMemberRoleDrafts] = useState({});
 
-  const tagsById = useMemo(() => Object.fromEntries(tags.map((tag) => [tag.id, tag])), [tags]);
+  const token = getStoredAccessToken();
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group.id === selectedGroupId) ?? null,
     [groups, selectedGroupId]
   );
 
-  const selectedGroupRegisteredMembers = selectedGroup?.registeredMembers ?? [];
+  const familiesById = useMemo(() => Object.fromEntries(families.map((family) => [family.id, family])), [families]);
+  const tagsById = useMemo(() => Object.fromEntries(tags.map((tag) => [tag.id, tag])), [tags]);
 
-  const getMemberRegistrationKey = (groupId, memberId) => `${groupId}:${memberId}`;
+  const selectedGroupMemberships = useMemo(
+    () => memberships.filter((membership) => membership.small_group_id === selectedGroupId),
+    [memberships, selectedGroupId]
+  );
 
-  const getRegisteredMemberStatus = (memberId) => {
-    const registration = selectedGroupRegisteredMembers.find((item) => item.memberId === memberId);
-    return registration?.status ?? null;
-  };
+  const filteredGroups = useMemo(() => {
+    const search = filters.search.trim().toLowerCase();
 
-  const getDraftMemberStatus = (memberId) => {
-    if (!selectedGroup) {
-      return "member";
-    }
+    return groups.filter((group) => {
+      const tagNames = (group.tags ?? []).map((tag) => tag.name).join(" ").toLowerCase();
+      const matchesSearch =
+        !search ||
+        group.name.toLowerCase().includes(search) ||
+        (group.description ?? "").toLowerCase().includes(search) ||
+        (group.location ?? "").toLowerCase().includes(search) ||
+        group.meetingDay.toLowerCase().includes(search) ||
+        normalizeTimeValue(group.meetingTime).toLowerCase().includes(search) ||
+        tagNames.includes(search);
+      const matchesMeetingDay = filters.meetingDay === "all" || group.meetingDay === filters.meetingDay;
+      const matchesStatus = filters.status === "all" || group.status === filters.status;
+      const groupTagIds = (group.tags ?? []).map((tag) => tag.id);
+      const matchesTag = !filters.tagIds.length || filters.tagIds.every((tagId) => groupTagIds.includes(tagId));
 
-    const key = getMemberRegistrationKey(selectedGroup.id, memberId);
-    return memberStatusDrafts[key] ?? getRegisteredMemberStatus(memberId) ?? "member";
-  };
-
-  const filteredMembers = useMemo(() => {
-    const search = memberSearch.trim().toLowerCase();
-
-    return MOCK_MEMBERS.filter((member) => {
-      const searchable = `${member.name} ${member.family}`.toLowerCase();
-      return !search || searchable.includes(search);
+      return matchesSearch && matchesMeetingDay && matchesStatus && matchesTag;
     });
-  }, [memberSearch]);
+  }, [filters, groups]);
 
   const filterOptions = useMemo(
     () => ({
@@ -154,55 +151,108 @@ export default function SmallGroupsPage() {
     [groups]
   );
 
-  const filteredGroups = useMemo(() => {
-    const search = filters.search.trim().toLowerCase();
+  const memberRows = useMemo(
+    () =>
+      members.map((member) => {
+        const membership = selectedGroupMemberships.find((item) => item.member_id === member.id) ?? null;
+        return {
+          member,
+          membership,
+          role: memberRoleDrafts[member.id] ?? membership?.role ?? "member",
+        };
+      }),
+    [memberRoleDrafts, members, selectedGroupMemberships]
+  );
 
-    return groups.filter((group) => {
-      const tagNames = group.tagIds.map((tagId) => tagsById[tagId]?.name ?? "").join(" ").toLowerCase();
-      const matchesSearch =
-        !search ||
-        group.name.toLowerCase().includes(search) ||
-        group.location.toLowerCase().includes(search) ||
-        group.meetingDay.toLowerCase().includes(search) ||
-        group.meetingTime.toLowerCase().includes(search) ||
-        tagNames.includes(search);
-      const matchesMeetingDay = filters.meetingDay === "all" || group.meetingDay === filters.meetingDay;
-      const matchesStatus = filters.status === "all" || group.status === filters.status;
-      const matchesTag =
-        !filters.tagIds.length || filters.tagIds.every((selectedTagId) => group.tagIds.includes(selectedTagId));
+  useEffect(() => {
+    const load = async () => {
+      if (!token) {
+        return;
+      }
 
-      return matchesSearch && matchesMeetingDay && matchesStatus && matchesTag;
-    });
-  }, [filters, groups, tagsById]);
+      try {
+        const [groupsPayload, tagsPayload, membersPayload, familiesPayload, membershipsPayload] = await Promise.all([
+          fetchSmallGroups(token),
+          fetchSmallGroupTags(token),
+          fetchMembers(token),
+          fetchFamilies(token),
+          fetchGroupMemberships(token),
+        ]);
 
-  const handleCreateGroup = (event) => {
-    event.preventDefault();
-
-    const newGroup = {
-      id: createGroupId(),
-      ...createForm,
-      name: createForm.name.trim(),
-      location: createForm.location.trim(),
-      meetingTime: createForm.meetingTime.trim(),
+        setGroups(groupsPayload ?? []);
+        setTags(tagsPayload ?? []);
+        setMembers(membersPayload ?? []);
+        setFamilies(familiesPayload ?? []);
+        setMemberships(membershipsPayload ?? []);
+      } catch {
+        setGroups([]);
+        setTags([]);
+        setMembers([]);
+        setFamilies([]);
+        setMemberships([]);
+      }
     };
 
-    setGroups((current) => [newGroup, ...current]);
-    setCreateForm(CREATE_INITIAL);
-    setCreateOpen(false);
-  };
+    load();
+  }, [token]);
 
-  const toggleCreateTag = (tagId) => {
-    setCreateForm((current) => {
-      const isSelected = current.tagIds.includes(tagId);
-      return {
-        ...current,
-        tagIds: isSelected ? current.tagIds.filter((value) => value !== tagId) : [...current.tagIds, tagId],
-      };
-    });
-  };
-
-  const handleRemoveSelectedGroup = () => {
+  useEffect(() => {
     if (!selectedGroup) {
+      setEditForm(null);
+      setMemberRoleDrafts({});
+      return;
+    }
+
+    setEditForm(null);
+    const drafts = {};
+    selectedGroupMemberships.forEach((membership) => {
+      drafts[membership.member_id] = membership.role;
+    });
+    setMemberRoleDrafts(drafts);
+  }, [selectedGroupId, selectedGroupMemberships]);
+
+  const refreshMemberships = async () => {
+    if (!token) {
+      return;
+    }
+
+    const payload = await fetchGroupMemberships(token);
+    setMemberships(payload ?? []);
+  };
+
+  const handleCreateGroup = async (event) => {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    try {
+      const created = await createSmallGroup(token, groupPayloadFromForm(createForm));
+      setGroups((current) => [created, ...current]);
+      setCreateForm(GROUP_FORM_INITIAL);
+      setCreateOpen(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to create small group");
+    }
+  };
+
+  const handleSaveGroup = async (event) => {
+    event.preventDefault();
+    if (!token || !selectedGroup || !editForm) {
+      return;
+    }
+
+    try {
+      const updated = await updateSmallGroup(token, selectedGroup.id, groupPayloadFromForm(editForm));
+      setGroups((current) => current.map((group) => (group.id === selectedGroup.id ? updated : group)));
+      setEditForm(groupToForm(updated));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update small group");
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!selectedGroup || !token) {
       return;
     }
 
@@ -211,156 +261,117 @@ export default function SmallGroupsPage() {
       return;
     }
 
-    setGroups((current) => current.filter((group) => group.id !== selectedGroup.id));
-    setSelectedGroupId(null);
-    setEditForm(null);
+    try {
+      await deleteSmallGroup(token, selectedGroup.id);
+      setGroups((current) => current.filter((group) => group.id !== selectedGroup.id));
+      setMemberships((current) => current.filter((membership) => membership.small_group_id !== selectedGroup.id));
+      setSelectedGroupId(null);
+      setEditForm(null);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete small group");
+    }
   };
 
-  const handleToggleEditTag = (tagId) => {
-    setEditForm((current) => {
-      if (!current) {
-        return current;
-      }
-
-      const isSelected = current.tagIds.includes(tagId);
-      return {
-        ...current,
-        tagIds: isSelected ? current.tagIds.filter((value) => value !== tagId) : [...current.tagIds, tagId],
-      };
-    });
-  };
-
-  const handleSaveGroup = (event) => {
+  const handleCreateTag = async (event) => {
     event.preventDefault();
-    if (!selectedGroup || !editForm) {
+    if (!token) {
       return;
     }
-
-    const updatedGroup = {
-      ...selectedGroup,
-      ...editForm,
-      name: editForm.name.trim(),
-      location: editForm.location.trim(),
-      meetingTime: editForm.meetingTime.trim(),
-    };
-
-    setGroups((current) => current.map((group) => (group.id === selectedGroup.id ? updatedGroup : group)));
-    setEditForm(null);
-  };
-
-  const handleSetMemberDraftStatus = (memberId, status) => {
-    if (!selectedGroup) {
-      return;
-    }
-
-    const key = getMemberRegistrationKey(selectedGroup.id, memberId);
-    setMemberStatusDrafts((current) => ({
-      ...current,
-      [key]: status,
-    }));
-
-    setGroups((current) =>
-      current.map((group) => {
-        if (group.id !== selectedGroup.id) {
-          return group;
-        }
-
-        const registeredMembers = group.registeredMembers ?? [];
-        const existing = registeredMembers.find((item) => item.memberId === memberId);
-        if (!existing) {
-          return group;
-        }
-
-        return {
-          ...group,
-          registeredMembers: registeredMembers.map((item) =>
-            item.memberId === memberId ? { ...item, status } : item
-          ),
-        };
-      })
-    );
-  };
-
-  const handleToggleMemberRegistration = (memberId) => {
-    if (!selectedGroup) {
-      return;
-    }
-
-    setGroups((current) =>
-      current.map((group) => {
-        if (group.id !== selectedGroup.id) {
-          return group;
-        }
-
-        const registeredMembers = group.registeredMembers ?? [];
-        const existing = registeredMembers.find((item) => item.memberId === memberId);
-        const draftStatus = getDraftMemberStatus(memberId);
-
-        if (existing) {
-          return {
-            ...group,
-            registeredMembers: registeredMembers.filter((item) => item.memberId !== memberId),
-          };
-        }
-
-        return {
-          ...group,
-          registeredMembers: [...registeredMembers, { memberId, status: draftStatus || "member" }],
-        };
-      })
-    );
-  };
-
-  const handleCreateTag = (event) => {
-    event.preventDefault();
 
     const name = tagForm.name.trim().toLowerCase();
     if (!name) {
       return;
     }
 
-    const newTag = {
-      id: Math.floor(1000 + Math.random() * 9000),
-      name,
-      color: tagForm.color || "#4f86d9",
-    };
-
-    setTags((current) => [newTag, ...current]);
-    setTagForm(TAG_INITIAL);
+    try {
+      const created = await createSmallGroupTag(token, { name, color: tagForm.color || null });
+      setTags((current) => [created, ...current]);
+      setTagForm(TAG_FORM_INITIAL);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to create tag");
+    }
   };
 
-  const handleRemoveTag = (tagId) => {
-    const tagToRemove = tagsById[tagId];
-    const confirmed = window.confirm(
-      `Remove small-group tag "${tagToRemove?.name ?? "this tag"}"? This will also remove it from all groups.`
-    );
+  const handleDeleteTag = async (tagId) => {
+    if (!token) {
+      return;
+    }
 
+    const tagToRemove = tagsById[tagId];
+    const confirmed = window.confirm(`Remove tag "${tagToRemove?.name ?? "this tag"}" from small groups?`);
     if (!confirmed) {
       return;
     }
 
-    setTags((current) => current.filter((tag) => tag.id !== tagId));
-    setGroups((current) =>
-      current.map((group) => ({
-        ...group,
-        tagIds: group.tagIds.filter((value) => value !== tagId),
-      }))
-    );
-    setCreateForm((current) => ({
-      ...current,
-      tagIds: current.tagIds.filter((value) => value !== tagId),
-    }));
-    setFilters((current) => ({
-      ...current,
-      tagIds: current.tagIds.filter((value) => value !== tagId),
-    }));
+    try {
+      await deleteSmallGroupTag(token, tagId);
+      setTags((current) => current.filter((tag) => tag.id !== tagId));
+      setGroups((current) =>
+        current.map((group) => ({
+          ...group,
+          tags: (group.tags ?? []).filter((tag) => tag.id !== tagId),
+        }))
+      );
+      setCreateForm((current) => ({
+        ...current,
+        tagIds: current.tagIds.filter((value) => value !== tagId),
+      }));
+      setFilters((current) => ({
+        ...current,
+        tagIds: current.tagIds.filter((value) => value !== tagId),
+      }));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete tag");
+    }
+  };
+
+  const handleSaveMembership = async (memberId) => {
+    if (!selectedGroup || !token) {
+      return;
+    }
+
+    const existing = selectedGroupMemberships.find((membership) => membership.member_id === memberId) ?? null;
+    const role = memberRoleDrafts[memberId] ?? existing?.role ?? "member";
+
+    try {
+      if (existing && existing.role === role) {
+        return;
+      }
+
+      if (existing) {
+        await deleteGroupMembership(token, existing.id);
+      }
+
+      await createGroupMembership(token, {
+        member_id: memberId,
+        small_group_id: selectedGroup.id,
+        role,
+      });
+
+      await refreshMemberships();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to update membership");
+    }
+  };
+
+  const handleDeleteMembership = async (membershipId) => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      await deleteGroupMembership(token, membershipId);
+      await refreshMemberships();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to delete membership");
+    }
   };
 
   return (
     <section className="events-page">
       <header className="events-header">
         <div>
-          <p className="events-subtitle">Track community small groups by schedule and location.</p>
+          <p className="events-subtitle">Track community small groups by schedule, tags, and membership.</p>
         </div>
 
         <div className="events-actions">
@@ -399,7 +410,7 @@ export default function SmallGroupsPage() {
             >
               <div className="event-series-main">
                 <h3>{group.name}</h3>
-                <p>{group.location || "No location"}</p>
+                <p>{group.description || group.location || "No description"}</p>
                 <div className="event-series-badges">
                   <span className="event-series-badge event-series-badge-recurrence">{group.meetingDay}</span>
                   <span className={`event-series-badge event-series-status-${group.status}`}>{group.status}</span>
@@ -409,19 +420,16 @@ export default function SmallGroupsPage() {
               <div className="event-series-tags-section">
                 <span className="event-series-section-label">Tags</span>
                 <div className="event-series-tag-list">
-                  {group.tagIds.length ? (
-                    group.tagIds.map((tagId) => {
-                      const tag = tagsById[tagId];
-                      if (!tag) {
-                        return null;
-                      }
-
-                      return (
-                        <span key={`group-${group.id}-${tag.id}`} className="events-tag-pill" style={{ borderColor: tag.color, color: tag.color }}>
-                          {tag.name}
-                        </span>
-                      );
-                    })
+                  {(group.tags ?? []).length ? (
+                    group.tags.map((tag) => (
+                      <span
+                        key={`group-${group.id}-${tag.id}`}
+                        className="events-tag-pill"
+                        style={{ borderColor: tag.color ?? "#4f86d9", color: tag.color ?? "#4f86d9" }}
+                      >
+                        {tag.name}
+                      </span>
+                    ))
                   ) : (
                     <span className="event-series-empty">No tags</span>
                   )}
@@ -434,7 +442,7 @@ export default function SmallGroupsPage() {
               </p>
               <p className="event-series-meta">
                 <span>Meeting Time</span>
-                <strong>{group.meetingTime || "-"}</strong>
+                <strong>{normalizeTimeValue(group.meetingTime) || "-"}</strong>
               </p>
               <p className="event-series-meta">
                 <span>Location</span>
@@ -465,7 +473,7 @@ export default function SmallGroupsPage() {
                 <input
                   value={filters.search}
                   onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-                  placeholder="Name, location, day, time, tags"
+                  placeholder="Name, description, day, time, tags"
                 />
               </label>
 
@@ -528,9 +536,9 @@ export default function SmallGroupsPage() {
                             };
                           })
                         }
-                        style={{ borderColor: tag.color }}
+                        style={{ borderColor: tag.color ?? "#4f86d9" }}
                       >
-                        <span className="events-tag-picker-dot" style={{ background: tag.color }} />
+                        <span className="events-tag-picker-dot" style={{ background: tag.color ?? "#4f86d9" }} />
                         {tag.name}
                       </button>
                     );
@@ -548,15 +556,15 @@ export default function SmallGroupsPage() {
 
       {createOpen ? (
         <div className="members-drawer-backdrop events-modal-backdrop" onClick={() => setCreateOpen(false)} role="presentation">
-          <aside className="events-modal-card events-modal-card-wide" onClick={(event) => event.stopPropagation()}>
+          <aside className="events-modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
-              <h3>Create Small Group</h3>
+              <h3>Add Small Group</h3>
               <button type="button" className="members-text-button" onClick={() => setCreateOpen(false)}>
                 Close
               </button>
             </div>
 
-            <form className="members-add-form" onSubmit={handleCreateGroup}>
+            <form className="members-form" onSubmit={handleCreateGroup}>
               <label>
                 Name
                 <input
@@ -565,45 +573,58 @@ export default function SmallGroupsPage() {
                   required
                 />
               </label>
-
+              <label>
+                Description
+                <input
+                  value={createForm.description}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))}
+                />
+              </label>
               <label>
                 Location
                 <input
                   value={createForm.location}
                   onChange={(event) => setCreateForm((current) => ({ ...current, location: event.target.value }))}
-                  required
                 />
               </label>
-
               <label>
                 Meeting Day
                 <select
                   value={createForm.meetingDay}
                   onChange={(event) => setCreateForm((current) => ({ ...current, meetingDay: event.target.value }))}
                 >
-                  <option value="Monday">Monday</option>
-                  <option value="Tuesday">Tuesday</option>
-                  <option value="Wednesday">Wednesday</option>
-                  <option value="Thursday">Thursday</option>
-                  <option value="Friday">Friday</option>
-                  <option value="Saturday">Saturday</option>
-                  <option value="Sunday">Sunday</option>
+                  {DAY_OPTIONS.map((day) => (
+                    <option key={day} value={day}>
+                      {day}
+                    </option>
+                  ))}
                 </select>
               </label>
-
               <label>
                 Meeting Time
                 <input
+                  type="time"
                   value={createForm.meetingTime}
                   onChange={(event) => setCreateForm((current) => ({ ...current, meetingTime: event.target.value }))}
-                  placeholder="e.g. 7:00 PM - 8:30 PM"
                   required
                 />
+              </label>
+              <label>
+                Status
+                <select
+                  value={createForm.status}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, status: event.target.value }))}
+                >
+                  {STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <fieldset className="events-tag-picker">
                 <legend>Tags</legend>
-                <p>Select all tags that apply to this group.</p>
                 <div className="events-tag-picker-list">
                   {tags.map((tag) => {
                     const selected = createForm.tagIds.includes(tag.id);
@@ -613,28 +634,26 @@ export default function SmallGroupsPage() {
                         key={tag.id}
                         type="button"
                         className={`events-tag-picker-item ${selected ? "events-tag-picker-item-selected" : ""}`}
-                        onClick={() => toggleCreateTag(tag.id)}
-                        style={{ borderColor: tag.color }}
+                        onClick={() =>
+                          setCreateForm((current) => {
+                            const isSelected = current.tagIds.includes(tag.id);
+                            return {
+                              ...current,
+                              tagIds: isSelected
+                                ? current.tagIds.filter((value) => value !== tag.id)
+                                : [...current.tagIds, tag.id],
+                            };
+                          })
+                        }
+                        style={{ borderColor: tag.color ?? "#4f86d9" }}
                       >
-                        <span className="events-tag-picker-dot" style={{ background: tag.color }} />
+                        <span className="events-tag-picker-dot" style={{ background: tag.color ?? "#4f86d9" }} />
                         {tag.name}
                       </button>
                     );
                   })}
                 </div>
               </fieldset>
-
-              <label>
-                Status
-                <select
-                  value={createForm.status}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, status: event.target.value }))}
-                >
-                  <option value="active">active</option>
-                  <option value="paused">paused</option>
-                  <option value="inactive">inactive</option>
-                </select>
-              </label>
 
               <button type="submit" className="members-primary-button">
                 Save Group
@@ -644,94 +663,161 @@ export default function SmallGroupsPage() {
         </div>
       ) : null}
 
+      {tagsOpen ? (
+        <div className="members-drawer-backdrop events-modal-backdrop" onClick={() => setTagsOpen(false)} role="presentation">
+          <aside className="events-modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="members-panel-head">
+              <h3>Small Group Tags</h3>
+              <button type="button" className="members-text-button" onClick={() => setTagsOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            <form className="members-form" onSubmit={handleCreateTag}>
+              <label>
+                Tag Name
+                <input
+                  value={tagForm.name}
+                  onChange={(event) => setTagForm((current) => ({ ...current, name: event.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Color
+                <input
+                  type="color"
+                  value={tagForm.color}
+                  onChange={(event) => setTagForm((current) => ({ ...current, color: event.target.value }))}
+                />
+              </label>
+              <button type="submit" className="members-primary-button">
+                Add Tag
+              </button>
+            </form>
+
+            <div className="events-tag-picker-list" style={{ marginTop: 16 }}>
+              {tags.map((tag) => (
+                <span key={tag.id} className="events-tag-pill" style={{ borderColor: tag.color ?? "#4f86d9", color: tag.color ?? "#4f86d9" }}>
+                  {tag.name}
+                  <button type="button" className="events-tag-remove-button" onClick={() => handleDeleteTag(tag.id)}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
       {selectedGroup ? (
-        <div
-          className="members-drawer-backdrop events-modal-backdrop"
-          onClick={() => {
-            setSelectedGroupId(null);
-            setEditForm(null);
-            setMemberSearch("");
-          }}
-          role="presentation"
-        >
+        <div className="members-drawer-backdrop events-modal-backdrop" onClick={() => setSelectedGroupId(null)} role="presentation">
           <aside className="events-modal-card events-detail-modal" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
               <h3>{selectedGroup.name}</h3>
-              <button
-                type="button"
-                className="members-text-button"
-                onClick={() => {
-                  setSelectedGroupId(null);
-                  setEditForm(null);
-                    setMemberSearch("");
-                }}
-              >
-                Close
-              </button>
+              <div className="members-panel-actions">
+                <button type="button" className="members-text-button" onClick={() => setSelectedGroupId(null)}>
+                  Close
+                </button>
+              </div>
             </div>
 
             {editForm ? (
               <form className="members-add-form" onSubmit={handleSaveGroup}>
                 <label>
                   Name
-                  <input value={editForm.name} onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))} required />
+                  <input
+                    value={editForm.name}
+                    onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Description
+                  <input
+                    value={editForm.description}
+                    onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))}
+                  />
                 </label>
                 <label>
                   Location
-                  <input value={editForm.location} onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))} required />
+                  <input
+                    value={editForm.location}
+                    onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))}
+                  />
                 </label>
                 <label>
                   Meeting Day
-                  <select value={editForm.meetingDay} onChange={(event) => setEditForm((current) => ({ ...current, meetingDay: event.target.value }))}>
-                    <option value="Monday">Monday</option>
-                    <option value="Tuesday">Tuesday</option>
-                    <option value="Wednesday">Wednesday</option>
-                    <option value="Thursday">Thursday</option>
-                    <option value="Friday">Friday</option>
-                    <option value="Saturday">Saturday</option>
-                    <option value="Sunday">Sunday</option>
+                  <select
+                    value={editForm.meetingDay}
+                    onChange={(event) => setEditForm((current) => ({ ...current, meetingDay: event.target.value }))}
+                  >
+                    {DAY_OPTIONS.map((day) => (
+                      <option key={day} value={day}>
+                        {day}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
                   Meeting Time
                   <input
+                    type="time"
                     value={editForm.meetingTime}
                     onChange={(event) => setEditForm((current) => ({ ...current, meetingTime: event.target.value }))}
-                    placeholder="e.g. 7:00 PM - 8:30 PM"
                     required
                   />
                 </label>
+                <label>
+                  Status
+                  <select
+                    value={editForm.status}
+                    onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value }))}
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
                 <fieldset className="events-tag-picker">
                   <legend>Tags</legend>
                   <div className="events-tag-picker-list">
                     {tags.map((tag) => {
                       const selected = editForm.tagIds.includes(tag.id);
+
                       return (
                         <button
-                          key={`edit-${tag.id}`}
+                          key={tag.id}
                           type="button"
                           className={`events-tag-picker-item ${selected ? "events-tag-picker-item-selected" : ""}`}
-                          onClick={() => handleToggleEditTag(tag.id)}
-                          style={{ borderColor: tag.color }}
+                          onClick={() =>
+                            setEditForm((current) => {
+                              const isSelected = current.tagIds.includes(tag.id);
+                              return {
+                                ...current,
+                                tagIds: isSelected
+                                  ? current.tagIds.filter((value) => value !== tag.id)
+                                  : [...current.tagIds, tag.id],
+                              };
+                            })
+                          }
+                          style={{ borderColor: tag.color ?? "#4f86d9" }}
                         >
-                          <span className="events-tag-picker-dot" style={{ background: tag.color }} />
+                          <span className="events-tag-picker-dot" style={{ background: tag.color ?? "#4f86d9" }} />
                           {tag.name}
                         </button>
                       );
                     })}
                   </div>
                 </fieldset>
-                <label>
-                  Status
-                  <select value={editForm.status} onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value }))}>
-                    <option value="active">active</option>
-                    <option value="paused">paused</option>
-                    <option value="inactive">inactive</option>
-                  </select>
-                </label>
-                <button type="submit" className="members-primary-button">
-                  Save Changes
-                </button>
+
+                <div className="members-panel-actions">
+                  <button type="submit" className="members-primary-button">
+                    Update Group
+                  </button>
+                </div>
               </form>
             ) : (
               <div className="events-detail-grid" role="list" aria-label="Selected small group details">
@@ -740,12 +826,8 @@ export default function SmallGroupsPage() {
                   <strong>{selectedGroup.id}</strong>
                 </p>
                 <p className="events-detail-item" role="listitem">
-                  <span>Name</span>
-                  <strong>{selectedGroup.name}</strong>
-                </p>
-                <p className="events-detail-item" role="listitem">
-                  <span>Location</span>
-                  <strong>{selectedGroup.location || "-"}</strong>
+                  <span>Status</span>
+                  <strong>{selectedGroup.status}</strong>
                 </p>
                 <p className="events-detail-item" role="listitem">
                   <span>Meeting Day</span>
@@ -753,105 +835,40 @@ export default function SmallGroupsPage() {
                 </p>
                 <p className="events-detail-item" role="listitem">
                   <span>Meeting Time</span>
-                  <strong>{selectedGroup.meetingTime || "-"}</strong>
+                  <strong>{normalizeTimeValue(selectedGroup.meetingTime) || "-"}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Location</span>
+                  <strong>{selectedGroup.location || "-"}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Description</span>
+                  <strong>{selectedGroup.description || "-"}</strong>
+                </p>
+                <p className="events-detail-item" role="listitem">
+                  <span>Members</span>
+                  <strong>{selectedGroupMemberships.length}</strong>
                 </p>
                 <div className="events-detail-item" role="listitem">
                   <span>Tags</span>
                   <div className="event-series-tag-list">
-                    {selectedGroup.tagIds.length ? (
-                      selectedGroup.tagIds.map((tagId) => {
-                        const tag = tagsById[tagId];
-                        if (!tag) {
-                          return null;
-                        }
-
-                        return (
-                          <span
-                            key={`detail-${selectedGroup.id}-${tag.id}`}
-                            className="events-tag-pill"
-                            style={{ borderColor: tag.color, color: tag.color }}
-                          >
-                            {tag.name}
-                          </span>
-                        );
-                      })
+                    {(selectedGroup.tags ?? []).length ? (
+                      selectedGroup.tags.map((tag) => (
+                        <span
+                          key={`selected-group-${selectedGroup.id}-${tag.id}`}
+                          className="events-tag-pill"
+                          style={{ borderColor: tag.color ?? "#4f86d9", color: tag.color ?? "#4f86d9" }}
+                        >
+                          {tag.name}
+                        </span>
+                      ))
                     ) : (
                       <strong>No tags</strong>
                     )}
                   </div>
                 </div>
-                <p className="events-detail-item" role="listitem">
-                  <span>Status</span>
-                  <strong>{selectedGroup.status}</strong>
-                </p>
               </div>
             )}
-
-            <div className="events-register-panel">
-              <div className="events-register-panel-head">
-                <div>
-                  <h3>Register Members</h3>
-                </div>
-
-                <p className="events-register-count">{selectedGroupRegisteredMembers.length} registered</p>
-              </div>
-
-              <label className="events-register-search">
-                Search members
-                <input
-                  value={memberSearch}
-                  onChange={(event) => setMemberSearch(event.target.value)}
-                  placeholder="Name or family"
-                />
-              </label>
-
-              <div className="events-register-list" role="list" aria-label="Member registration list">
-                {filteredMembers.length ? (
-                  filteredMembers.map((member) => {
-                    const registeredStatus = getRegisteredMemberStatus(member.id);
-                    const isRegistered = Boolean(registeredStatus);
-                    const draftStatus = getDraftMemberStatus(member.id);
-
-                    return (
-                      <div key={member.id} className="events-register-row" role="listitem">
-                        <div className="events-register-row-main">
-                          <strong>{member.name}</strong>
-                          <span>{member.family}</span>
-                        </div>
-
-                        <div className="events-register-row-actions">
-                          <span className={`events-register-pill ${isRegistered ? "events-register-pill-active" : ""}`}>
-                            {isRegistered ? "Registered" : "Not registered"}
-                          </span>
-                          <label className="events-register-status-select">
-                            Status
-                            <select
-                              value={draftStatus}
-                              onChange={(event) => handleSetMemberDraftStatus(member.id, event.target.value)}
-                            >
-                              {MEMBER_STATUS_OPTIONS.map((status) => (
-                                <option key={status} value={status}>
-                                  {status}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <button
-                            type="button"
-                            className={isRegistered ? "events-tag-remove-button" : "members-secondary-button"}
-                            onClick={() => handleToggleMemberRegistration(member.id)}
-                          >
-                            {isRegistered ? "Unregister" : "Register as member"}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="events-register-empty">No members match your search.</p>
-                )}
-              </div>
-            </div>
 
             <div className="detail-modal-actions">
               {editForm ? (
@@ -863,81 +880,55 @@ export default function SmallGroupsPage() {
                   Edit Group
                 </button>
               )}
-              <button type="button" className="events-tag-remove-button" onClick={handleRemoveSelectedGroup}>
+              <button type="button" className="events-tag-remove-button" onClick={handleDeleteGroup}>
                 Remove Group
               </button>
             </div>
-          </aside>
-        </div>
-      ) : null}
 
-      {tagsOpen ? (
-        <div className="members-drawer-backdrop events-modal-backdrop" onClick={() => setTagsOpen(false)} role="presentation">
-          <aside className="events-modal-card events-modal-card-tags" onClick={(event) => event.stopPropagation()}>
-            <div className="members-panel-head">
-              <h3>Manage Small Group Tags</h3>
-              <button type="button" className="members-text-button" onClick={() => setTagsOpen(false)}>
-                Close
-              </button>
+            <div className="members-panel-head" style={{ marginTop: 20 }}>
+              <h4>Members</h4>
             </div>
 
-            <div className="events-tag-panel">
-              <div className="events-tag-panel-head">
-                <div>
-                  <h3>Create Tags</h3>
-                </div>
-
-                <p className="events-tag-count">{tags.length} available</p>
-              </div>
-
-              <form className="events-tag-form" onSubmit={handleCreateTag}>
-                <label>
-                  Tag Name
-                  <input
-                    value={tagForm.name}
-                    onChange={(event) => setTagForm((current) => ({ ...current, name: event.target.value }))}
-                    placeholder="e.g. campus-west"
-                  />
-                </label>
-
-                <label>
-                  Color
-                  <input
-                    type="color"
-                    value={tagForm.color}
-                    onChange={(event) => setTagForm((current) => ({ ...current, color: event.target.value }))}
-                  />
-                </label>
-
-                <button type="submit" className="members-secondary-button">
-                  Add Tag
-                </button>
-              </form>
-
-              <div className="events-tag-library" aria-label="Small group tag library">
-                {tags.map((tag) => (
-                  <span key={tag.id} className="events-tag-pill" style={{ borderColor: tag.color, color: tag.color }}>
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-
-              <div className="events-tag-remove-section">
-                <h4>Remove Tags</h4>
-                <div className="events-tag-remove-list">
-                  {tags.map((tag) => (
-                    <div key={`remove-${tag.id}`} className="events-tag-remove-row">
-                      <span className="events-tag-pill" style={{ borderColor: tag.color, color: tag.color }}>
-                        {tag.name}
-                      </span>
-                      <button type="button" className="events-tag-remove-button" onClick={() => handleRemoveTag(tag.id)}>
-                        Remove
-                      </button>
+            <div className="events-register-list">
+              {memberRows.length ? (
+                memberRows.map(({ member, membership, role }) => (
+                  <div key={member.id} className="events-register-row">
+                    <div className="events-register-row-main">
+                      <strong>{formatMemberName(member)}</strong>
+                      <span>{formatFamilyName(member, familiesById)}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
+
+                    <div className="events-register-row-actions">
+                      <span className={`events-register-pill ${membership ? "events-register-pill-active" : ""}`}>
+                        {membership ? "Registered" : "Not Registered"}
+                      </span>
+                      <select
+                        className="events-register-select"
+                        value={role}
+                        onChange={(event) => setMemberRoleDrafts((current) => ({ ...current, [member.id]: event.target.value }))}
+                      >
+                        {ROLE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="button" className="members-secondary-button" onClick={() => handleSaveMembership(member.id)}>
+                        {membership ? "Save" : "Add"}
+                      </button>
+                      {membership ? (
+                        <button type="button" className="members-secondary-button" onClick={() => handleDeleteMembership(membership.id)}>
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="events-register-empty">No members available.</p>
+              )}
             </div>
+
           </aside>
         </div>
       ) : null}

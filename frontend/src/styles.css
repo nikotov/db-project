@@ -788,6 +788,16 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.events-register-select {
+  border: 1px solid #334567;
+  background: #0a1224;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.86rem;
+  min-width: 120px;
+}
+
 .events-register-pill {
   display: inline-flex;
   align-items: center;
