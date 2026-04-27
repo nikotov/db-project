@@ -665,45 +665,54 @@ export default function SmallGroupsPage() {
 
       {tagsOpen ? (
         <div className="members-drawer-backdrop events-modal-backdrop" onClick={() => setTagsOpen(false)} role="presentation">
-          <aside className="events-modal-card" onClick={(event) => event.stopPropagation()}>
+          <aside className="events-modal-card events-modal-card-tags" onClick={(event) => event.stopPropagation()}>
             <div className="members-panel-head">
               <h3>Small Group Tags</h3>
               <button type="button" className="members-text-button" onClick={() => setTagsOpen(false)}>
                 Close
               </button>
             </div>
+            
+            <div className="events-tag-panel">
+              <div className="events-tag-panel-head">
+                <div>
+                  <h3>Create Tags</h3>
+                </div>
+                <p className="events-tag-count">{tags.length} available</p>
+              </div>
 
-            <form className="members-form" onSubmit={handleCreateTag}>
-              <label>
-                Tag Name
-                <input
-                  value={tagForm.name}
-                  onChange={(event) => setTagForm((current) => ({ ...current, name: event.target.value }))}
-                  required
-                />
-              </label>
-              <label>
-                Color
-                <input
-                  type="color"
-                  value={tagForm.color}
-                  onChange={(event) => setTagForm((current) => ({ ...current, color: event.target.value }))}
-                />
-              </label>
-              <button type="submit" className="members-primary-button">
-                Add Tag
-              </button>
-            </form>
+              <form className="event-tag-form" onSubmit={handleCreateTag}>
+                <label>
+                  Tag Name
+                  <input
+                    value={tagForm.name}
+                    onChange={(event) => setTagForm((current) => ({ ...current, name: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Color
+                  <input
+                    type="color"
+                    value={tagForm.color}
+                    onChange={(event) => setTagForm((current) => ({ ...current, color: event.target.value }))}
+                  />
+                </label>
+                <button type="submit" className="members-primary-button">
+                  Add Tag
+                </button>
+              </form>
 
-            <div className="events-tag-picker-list" style={{ marginTop: 16 }}>
-              {tags.map((tag) => (
-                <span key={tag.id} className="events-tag-pill" style={{ borderColor: tag.color ?? "#4f86d9", color: tag.color ?? "#4f86d9" }}>
-                  {tag.name}
-                  <button type="button" className="events-tag-remove-button" onClick={() => handleDeleteTag(tag.id)}>
-                    ×
-                  </button>
-                </span>
-              ))}
+              <div className="events-tag-picker-list" style={{ marginTop: 16 }}>
+                {tags.map((tag) => (
+                  <span key={tag.id} className="events-tag-pill" style={{ borderColor: tag.color ?? "#4f86d9", color: tag.color ?? "#4f86d9" }}>
+                    {tag.name}
+                    <button type="button" className="events-tag-remove-button" onClick={() => handleDeleteTag(tag.id)}>
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             </div>
           </aside>
         </div>
