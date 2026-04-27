@@ -119,8 +119,8 @@ class EventSeries(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
 
-    instances: Mapped[list["EventInstance"]] = relationship(back_populates="series", lazy="selectin")
-    tags: Mapped[list["EventSeriesTagMap"]] = relationship(back_populates="event_series", lazy="selectin")
+    instances: Mapped[list["EventInstance"]] = relationship(back_populates="series", lazy="selectin", cascade="all, delete-orphan")
+    tags: Mapped[list["EventSeriesTagMap"]] = relationship(back_populates="event_series", lazy="selectin", cascade="all, delete-orphan")
 
 
 class EventInstance(Base):
@@ -132,11 +132,11 @@ class EventInstance(Base):
     start_datetime: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     end_datetime: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     attendee_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    event_series_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_series.id"), nullable=False)
+    event_series_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_series.id", ondelete="CASCADE"), nullable=False)
 
     series: Mapped["EventSeries"] = relationship(back_populates="instances", lazy="joined")
-    group_counts: Mapped[list["EventInstanceGroupCount"]] = relationship(back_populates="event_instance", lazy="selectin")
-    member_attendance: Mapped[list["EventMemberAttendance"]] = relationship(back_populates="event_instance", lazy="selectin")
+    group_counts: Mapped[list["EventInstanceGroupCount"]] = relationship(back_populates="event_instance", lazy="selectin", cascade="all, delete-orphan")
+    member_attendance: Mapped[list["EventMemberAttendance"]] = relationship(back_populates="event_instance", lazy="selectin", cascade="all, delete-orphan")
 
 
 class EventTag(Base):
@@ -146,14 +146,14 @@ class EventTag(Base):
     name: Mapped[str] = mapped_column(String(45), nullable=False, unique=True)
     color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
 
-    series: Mapped[list["EventSeriesTagMap"]] = relationship(back_populates="event_tag", lazy="selectin")
+    series: Mapped[list["EventSeriesTagMap"]] = relationship(back_populates="event_tag", lazy="selectin", cascade="all, delete-orphan")
 
 
 class EventSeriesTagMap(Base):
     __tablename__ = "event_series_tag_map"
 
-    event_series_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_series.id"), nullable=False, primary_key=True)
-    event_tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_tag.id"), nullable=False, primary_key=True)
+    event_series_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_series.id", ondelete="CASCADE"), nullable=False, primary_key=True)
+    event_tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_tag.id", ondelete="CASCADE"), nullable=False, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
 
@@ -168,14 +168,14 @@ class AttendanceGroup(Base):
     name: Mapped[str] = mapped_column(String(45), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    event_counts: Mapped[list["EventInstanceGroupCount"]] = relationship(back_populates="attendance_group", lazy="selectin")
+    event_counts: Mapped[list["EventInstanceGroupCount"]] = relationship(back_populates="attendance_group", lazy="selectin", cascade="all, delete-orphan")
 
 
 class EventInstanceGroupCount(Base):
     __tablename__ = "event_instance_group_count"
 
-    event_instance_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_instance.id"), nullable=False, primary_key=True)
-    attendance_group_id: Mapped[int] = mapped_column(Integer, ForeignKey("attendance_group.id"), nullable=False, primary_key=True)
+    event_instance_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_instance.id", ondelete="CASCADE"), nullable=False, primary_key=True)
+    attendance_group_id: Mapped[int] = mapped_column(Integer, ForeignKey("attendance_group.id", ondelete="CASCADE"), nullable=False, primary_key=True)
     count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     event_instance: Mapped["EventInstance"] = relationship(back_populates="group_counts", lazy="joined")
@@ -185,8 +185,8 @@ class EventInstanceGroupCount(Base):
 class EventMemberAttendance(Base):
     __tablename__ = "event_member_attendance"
 
-    event_instance_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_instance.id"), nullable=False, primary_key=True)
-    member_id: Mapped[int] = mapped_column(Integer, ForeignKey("member.id"), nullable=False, primary_key=True)
+    event_instance_id: Mapped[int] = mapped_column(Integer, ForeignKey("event_instance.id", ondelete="CASCADE"), nullable=False, primary_key=True)
+    member_id: Mapped[int] = mapped_column(Integer, ForeignKey("member.id", ondelete="CASCADE"), nullable=False, primary_key=True)
     
     registration_status: Mapped[MemberRegistrationStatusEnum] = mapped_column(
         MEMBER_REGISTRATION_STATUS_ENUM,
@@ -220,8 +220,8 @@ class SmallGroup(Base):
         nullable=False,
         default=SmallGroupStatusEnum.active,
     )
-    memberships: Mapped[list["GroupMembership"]] = relationship(back_populates="small_group", lazy="selectin")
-    tags: Mapped[list["SmallGroupTagMap"]] = relationship(back_populates="small_group", lazy="selectin")
+    memberships: Mapped[list["GroupMembership"]] = relationship(back_populates="small_group", lazy="selectin", cascade="all, delete-orphan")
+    tags: Mapped[list["SmallGroupTagMap"]] = relationship(back_populates="small_group", lazy="selectin", cascade="all, delete-orphan")
 
 
 class SmallGroupTag(Base):
@@ -230,14 +230,14 @@ class SmallGroupTag(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(45), nullable=False, unique=True)
     color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
-    group_tags: Mapped[list["SmallGroupTagMap"]] = relationship(back_populates="tag", lazy="selectin")
+    group_tags: Mapped[list["SmallGroupTagMap"]] = relationship(back_populates="tag", lazy="selectin", cascade="all, delete-orphan")
 
 
 class SmallGroupTagMap(Base):
     __tablename__ = "small_group_tag_map"
 
-    small_group_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group.id"), nullable=False, primary_key=True)
-    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group_tag.id"), nullable=False, primary_key=True)
+    small_group_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group.id", ondelete="CASCADE"), nullable=False, primary_key=True)
+    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group_tag.id", ondelete="CASCADE"), nullable=False, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
 
@@ -249,8 +249,8 @@ class GroupMembership(Base):
     __tablename__ = "group_membership"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    member_id: Mapped[int] = mapped_column(Integer, ForeignKey("member.id"), nullable=False)
-    small_group_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group.id"), nullable=False)
+    member_id: Mapped[int] = mapped_column(Integer, ForeignKey("member.id", ondelete="CASCADE"), nullable=False)
+    small_group_id: Mapped[int] = mapped_column(Integer, ForeignKey("small_group.id", ondelete="CASCADE"), nullable=False)
     role: Mapped[GroupMembershipStatusEnum] = mapped_column(
         GROUP_MEMBERSHIP_STATUS_ENUM,
         nullable=False,
@@ -310,7 +310,7 @@ class Family(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(45), nullable=False)
 
-    members: Mapped[list["Member"]] = relationship(back_populates="family", lazy="selectin")
+    members: Mapped[list["Member"]] = relationship(back_populates="family", lazy="selectin", cascade="all, delete-orphan")
 
 
 class UserAccount(Base):
@@ -323,14 +323,14 @@ class UserAccount(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
-    logs: Mapped[list["UserLogs"]] = relationship(back_populates="user", lazy="selectin")
+    logs: Mapped[list["UserLogs"]] = relationship(back_populates="user", lazy="selectin", cascade="all, delete-orphan")
 
 
 class UserLogs(Base):
     __tablename__ = "user_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_account.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False)
     action_type: Mapped[str] = mapped_column(String(45), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
