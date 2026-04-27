@@ -1,71 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import {
+  fetchAttendanceGroups,
+  fetchMemberAttendance,
+  fetchEventInstances,
+  getStoredAccessToken,
+  apiFetch,
+} from "../../../api/client";
 
-const MOCK_ATTENDANCE_TAGS = [
-  { id: 1, name: "service", color: "#4f86d9" },
-  { id: 2, name: "small-group", color: "#7c5cff" },
-  { id: 3, name: "prayer", color: "#2f9e7a" },
-  { id: 4, name: "leaders", color: "#e08a2e" },
-];
 
-const MOCK_INSTANCES = [
-  {
-    id: 1,
-    seriesName: "Young Adults Small Group",
-    startAt: "2026-04-21T19:00:00",
-    endAt: "2026-04-21T20:30:00",
-    location: "Room 204",
-    attendanceType: "individual",
-    tagIds: [2],
-    registeredMemberIds: [1, 3, 5],
-  },
-  {
-    id: 2,
-    seriesName: "Leaders Planning Meeting",
-    startAt: "2026-04-23T20:15:00",
-    endAt: "2026-04-23T21:30:00",
-    location: "Conference Room A",
-    attendanceType: "general",
-    tagIds: [4],
-    registeredMemberIds: [2, 4],
-  },
-  {
-    id: 3,
-    seriesName: "Neighborhood Prayer Night",
-    startAt: "2026-04-25T19:30:00",
-    endAt: "2026-04-25T21:30:00",
-    location: "Prayer Hall",
-    attendanceType: "general",
-    tagIds: [3],
-    registeredMemberIds: [1, 2, 6],
-  },
-  {
-    id: 4,
-    seriesName: "Sunday Service",
-    startAt: "2026-04-27T10:00:00",
-    endAt: "2026-04-27T11:30:00",
-    location: "Main Auditorium",
-    attendanceType: "individual",
-    tagIds: [1],
-    registeredMemberIds: [1, 2, 4],
-  },
-];
-
-const MOCK_ATTENDANCE_GROUPS = [
-  { id: "adults", label: "Adults" },
-  { id: "youth", label: "Youth" },
-  { id: "kids", label: "Kids" },
-  { id: "visitors", label: "Visitors" },
-];
-
-const MOCK_MEMBERS = [
-  { id: 1, name: "Daniel Gomez" },
-  { id: 2, name: "Mariana Lopez" },
-  { id: 3, name: "Samuel Ortiz" },
-  { id: 4, name: "Elena Vega" },
-  { id: 5, name: "Camila Rivera" },
-  { id: 6, name: "Jorge Mendez" },
-];
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -138,74 +81,120 @@ function parseTimeToMinutes(timeText) {
   return hours * 60 + minutes;
 }
 
-function buildInitialGroupCounts() {
-  return Object.fromEntries(MOCK_ATTENDANCE_GROUPS.map((group) => [group.id, 0]));
+
+function buildInitialGroupCounts(groups) {
+  return Object.fromEntries((groups || []).map((group) => [group.id, 0]));
 }
 
-function buildInitialMemberRows(instance) {
-  const registeredMemberIds = instance?.registeredMemberIds ?? [];
-  const registeredMembers = MOCK_MEMBERS.filter((member) => registeredMemberIds.includes(member.id));
-
-  return registeredMembers.map((member) => ({
+function buildInitialMemberRows(members) {
+  return (members || []).map((member) => ({
     memberId: member.id,
     name: member.name,
     status: "absent",
   }));
 }
 
+
 export default function AttendancePage() {
   const [searchParams] = useSearchParams();
   const queryInstanceId = Number(searchParams.get("instanceId"));
 
-  const initialInstance = MOCK_INSTANCES.find((item) => item.id === queryInstanceId) ?? MOCK_INSTANCES[0];
+  // State for fetched data
+  const [attendanceGroups, setAttendanceGroups] = useState([]);
+  const [instances, setInstances] = useState([]);
+  const [tags, setTags] = useState([]); // If you have event tags API, fetch here
+  const [members, setMembers] = useState([]); // If you have members API, fetch here
 
-  const [selectedInstanceId, setSelectedInstanceId] = useState(queryInstanceId ? initialInstance.id : null);
+  // UI state
+  const [selectedInstanceId, setSelectedInstanceId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [generalTotalCount, setGeneralTotalCount] = useState(0);
-  const [groupCounts, setGroupCounts] = useState(buildInitialGroupCounts);
-  const [memberRows, setMemberRows] = useState(() => buildInitialMemberRows(initialInstance));
+  const [groupCounts, setGroupCounts] = useState({});
+  const [memberRows, setMemberRows] = useState([]);
   const [notes, setNotes] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState(null);
 
+  // Fetch attendance groups and event instances on mount
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    fetchAttendanceGroups(token)
+      .then(setAttendanceGroups)
+      .catch(() => setAttendanceGroups([]));
+    fetchEventInstances(token)
+      .then(setInstances)
+      .catch(() => setInstances([]));
+    // Optionally fetch tags and members if needed
+  }, []);
+
+  // Set initial instance selection after data loads
+  useEffect(() => {
+    if (instances.length) {
+      const initial =
+        instances.find((item) => item.id === queryInstanceId) || instances[0];
+      setSelectedInstanceId(initial?.id || null);
+    }
+  }, [instances, queryInstanceId]);
+
+  // Fetch member attendance when instance changes
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    if (selectedInstanceId) {
+      fetchMemberAttendance(token, selectedInstanceId)
+        .then((attendance) => {
+          // Map backend attendance to memberRows shape
+          setMemberRows(
+            (attendance || []).map((row) => ({
+              memberId: row.member_id,
+              name: row.member_name || `Member #${row.member_id}`,
+              status: row.attendance_status === "attended" ? "present" : "absent",
+            }))
+          );
+        })
+        .catch(() => setMemberRows([]));
+    } else {
+      setMemberRows([]);
+    }
+  }, [selectedInstanceId]);
+
+  // Build tagsById from tags
   const tagsById = useMemo(
-    () => Object.fromEntries(MOCK_ATTENDANCE_TAGS.map((tag) => [tag.id, tag])),
-    []
+    () => Object.fromEntries((tags || []).map((tag) => [tag.id, tag])),
+    [tags]
   );
 
   const selectedInstance = useMemo(
-    () => MOCK_INSTANCES.find((instance) => instance.id === selectedInstanceId) ?? null,
-    [selectedInstanceId]
+    () => instances.find((instance) => instance.id === selectedInstanceId) || null,
+    [instances, selectedInstanceId]
   );
 
   const filterOptions = useMemo(
     () => ({
-      attendanceTypes: [...new Set(MOCK_INSTANCES.map((instance) => instance.attendanceType))],
-      days: [...new Set(MOCK_INSTANCES.map((instance) => new Date(instance.startAt).toLocaleDateString(undefined, { weekday: "long" })))],
+      attendanceTypes: [...new Set(instances.map((instance) => instance.attendanceType))],
+      days: [...new Set(instances.map((instance) => new Date(instance.startAt).toLocaleDateString(undefined, { weekday: "long" })))],
     }),
-    []
+    [instances]
   );
 
   const filteredInstances = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
-
-    return MOCK_INSTANCES.filter((instance) => {
+    return (instances || []).filter((instance) => {
       const start = new Date(instance.startAt);
       const startMinutes = start.getHours() * 60 + start.getMinutes();
       const instanceDay = start.toLocaleDateString(undefined, { weekday: "long" });
-      const tagNames = instance.tagIds.map((tagId) => tagsById[tagId]?.name ?? "").join(" ").toLowerCase();
+      const tagNames = (instance.tagIds || []).map((tagId) => tagsById[tagId]?.name ?? "").join(" ").toLowerCase();
       const matchesSearch =
         !search ||
-        instance.seriesName.toLowerCase().includes(search) ||
-        instance.location.toLowerCase().includes(search) ||
-        instance.attendanceType.toLowerCase().includes(search) ||
+        (instance.seriesName || "").toLowerCase().includes(search) ||
+        (instance.location || "").toLowerCase().includes(search) ||
+        (instance.attendanceType || "").toLowerCase().includes(search) ||
         formatDate(instance.startAt).toLowerCase().includes(search) ||
         formatTimeRange(instance.startAt, instance.endAt).toLowerCase().includes(search) ||
         tagNames.includes(search);
       const matchesAttendanceType =
         filters.attendanceType === "all" || instance.attendanceType === filters.attendanceType;
       const matchesTag =
-        !filters.tagIds.length || filters.tagIds.every((selectedTagId) => instance.tagIds.includes(selectedTagId));
+        !filters.tagIds.length || filters.tagIds.every((selectedTagId) => (instance.tagIds || []).includes(selectedTagId));
       const matchesDay = filters.day === "all" || instanceDay === filters.day;
 
       const afterDate = filters.dateAfter ? new Date(`${filters.dateAfter}T00:00:00`) : null;
@@ -229,7 +218,7 @@ export default function AttendancePage() {
         matchesTimeBefore
       );
     });
-  }, [filters, tagsById]);
+  }, [filters, tagsById, instances]);
 
   const presentCount = useMemo(
     () => memberRows.filter((member) => member.status === "present").length,
@@ -237,12 +226,10 @@ export default function AttendancePage() {
   );
 
   const handleOpenInstance = (instanceId) => {
-    const nextInstance = MOCK_INSTANCES.find((instance) => instance.id === instanceId) ?? MOCK_INSTANCES[0];
-
     setSelectedInstanceId(instanceId);
     setGeneralTotalCount(0);
-    setGroupCounts(buildInitialGroupCounts());
-    setMemberRows(buildInitialMemberRows(nextInstance));
+    setGroupCounts(buildInitialGroupCounts(attendanceGroups));
+    setMemberRows([]); // Will be loaded by useEffect
     setNotes("");
     setLastSavedAt(null);
   };
@@ -252,8 +239,49 @@ export default function AttendancePage() {
     setLastSavedAt(null);
   };
 
-  const handleSaveAttendance = () => {
-    setLastSavedAt(new Date().toISOString());
+  // Save attendance handler (example for member attendance)
+  const handleSaveAttendance = async () => {
+    const token = getStoredAccessToken();
+    if (!selectedInstance) return;
+    try {
+      if (selectedInstance.attendanceType === "general") {
+        // Save general attendance
+        await apiFetch(
+          "/attendance/general",
+          token,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              event_instance_id: selectedInstance.id,
+              attendee_count: generalTotalCount,
+              group_counts: Object.entries(groupCounts).map(([attendance_group_id, count]) => ({ attendance_group_id: Number(attendance_group_id), count })),
+            }),
+          }
+        );
+      } else {
+        // Save member attendance
+        await Promise.all(
+          memberRows.map((row) =>
+            apiFetch(
+              "/attendance/member",
+              token,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  event_instance_id: selectedInstance.id,
+                  member_id: row.memberId,
+                  attendance_status: row.status === "present" ? "attended" : "absent",
+                  registration_status: "registered",
+                }),
+              }
+            )
+          )
+        );
+      }
+      setLastSavedAt(new Date().toISOString());
+    } catch (err) {
+      alert("Failed to save attendance");
+    }
   };
 
   return (
@@ -617,4 +645,5 @@ export default function AttendancePage() {
       ) : null}
     </section>
   );
+
 }
