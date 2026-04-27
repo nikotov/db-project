@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   fetchAttendanceGroups,
   fetchMemberAttendance,
   fetchEventInstances,
+  fetchEventTags,
+  fetchMembers,
+  fetchGeneralAttendance,
   getStoredAccessToken,
-  apiFetch,
+  upsertGeneralAttendance,
+  upsertMemberAttendance,
 } from "../../../api/client";
 
-
+// Helpers 
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -23,267 +27,295 @@ const DEFAULT_FILTERS = {
 
 function formatDateTime(value) {
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
+  if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    weekday: "short", month: "short", day: "numeric",
+    year: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }
 
 function formatDate(value) {
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
+  if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+    weekday: "short", month: "short", day: "numeric", year: "numeric",
   });
 }
 
 function formatTimeRange(startAt, endAt) {
   const start = new Date(startAt);
-  const end = new Date(endAt);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+  const end   = new Date(endAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()))
     return `${startAt} - ${endAt}`;
-  }
-
-  return `${start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} - ${end.toLocaleTimeString(
-    undefined,
-    { hour: "2-digit", minute: "2-digit" }
-  )}`;
+  return `${start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} - ${end.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function parseTimeToMinutes(timeText) {
-  if (!timeText || !timeText.includes(":")) {
-    return null;
-  }
-
-  const [hoursText, minutesText] = timeText.split(":");
-  const hours = Number(hoursText);
-  const minutes = Number(minutesText);
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-    return null;
-  }
-
-  return hours * 60 + minutes;
+  if (!timeText || !timeText.includes(":")) return null;
+  const [h, m] = timeText.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
 }
 
-
-function buildInitialGroupCounts(groups) {
-  return Object.fromEntries((groups || []).map((group) => [group.id, 0]));
+function normalizeInstance(raw) {
+  return {
+    id:              raw.id,
+    eventSeriesId:   raw.event_series_id,
+    seriesName:      raw.series_name      ?? `Instance #${raw.id}`,
+    attendanceType:  raw.attendance_type  ?? "general",
+    startAt:         raw.start_datetime,
+    endAt:           raw.end_datetime,
+    location:        raw.location         ?? "",
+    attendanceNotes: raw.attendance_notes ?? "",
+    attendeeCount:   raw.attendee_count   ?? 0,
+    tagIds:          (raw.tags ?? []).map((t) => t.id),
+    _tags:           raw.tags             ?? [],
+    _groupCounts:    raw.group_counts     ?? [],
+  };
 }
 
-function buildInitialMemberRows(members) {
-  return (members || []).map((member) => ({
-    memberId: member.id,
-    name: member.name,
-    status: "absent",
-  }));
-}
-
+// Component 
 
 export default function AttendancePage() {
   const [searchParams] = useSearchParams();
   const queryInstanceId = Number(searchParams.get("instanceId"));
 
-  // State for fetched data
+  // Remote data
   const [attendanceGroups, setAttendanceGroups] = useState([]);
-  const [instances, setInstances] = useState([]);
-  const [tags, setTags] = useState([]); // If you have event tags API, fetch here
-  const [members, setMembers] = useState([]); // If you have members API, fetch here
+  const [instances, setInstances]               = useState([]);
+  const [tagsById, setTagsById]                 = useState({});
+  const [membersById, setMembersById]           = useState({});
+  const [loadingData, setLoadingData]           = useState(true);
+  const [dataError, setDataError]               = useState(null);
 
-  // UI state
+  //  UI state
   const [selectedInstanceId, setSelectedInstanceId] = useState(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [generalTotalCount, setGeneralTotalCount] = useState(0);
-  const [groupCounts, setGroupCounts] = useState({});
-  const [memberRows, setMemberRows] = useState([]);
-  const [notes, setNotes] = useState("");
-  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [filtersOpen, setFiltersOpen]               = useState(false);
+  const [filters, setFilters]                       = useState(DEFAULT_FILTERS);
 
-  // Fetch attendance groups and event instances on mount
+  // Attendance-editor state
+  const [generalTotalCount, setGeneralTotalCount] = useState(0);
+  const [groupCounts, setGroupCounts]             = useState({});
+  const [memberRows, setMemberRows]               = useState([]);
+  const [notes, setNotes]                         = useState("");
+  const [loadingModal, setLoadingModal]           = useState(false);
+  const [saving, setSaving]                       = useState(false);
+  const [saveError, setSaveError]                 = useState(null);
+  const [lastSavedAt, setLastSavedAt]             = useState(null);
+
+  // Initial data load 
   useEffect(() => {
     const token = getStoredAccessToken();
-    fetchAttendanceGroups(token)
-      .then(setAttendanceGroups)
-      .catch(() => setAttendanceGroups([]));
-    fetchEventInstances(token)
-      .then(setInstances)
-      .catch(() => setInstances([]));
-    // Optionally fetch tags and members if needed
+    setLoadingData(true);
+    setDataError(null);
+
+    Promise.all([
+      fetchAttendanceGroups(token).catch(() => []),
+      fetchEventInstances(token).catch(() => []),
+      fetchEventTags(token).catch(() => []),
+      fetchMembers(token).catch(() => []),
+    ])
+      .then(([groups, rawInstances, tags, members]) => {
+        setAttendanceGroups(groups ?? []);
+
+        const normalized = (rawInstances ?? []).map(normalizeInstance);
+        setInstances(normalized);
+
+        // Merge tags from standalone list and from instance embedded tags
+        const merged = {};
+        (tags ?? []).forEach((t) => { merged[t.id] = t; });
+        normalized.forEach((inst) => inst._tags.forEach((t) => { merged[t.id] = t; }));
+        setTagsById(merged);
+
+        const mById = {};
+        (members ?? []).forEach((m) => { mById[m.id] = m; });
+        setMembersById(mById);
+      })
+      .catch((err) => setDataError(err.message ?? "Failed to load data"))
+      .finally(() => setLoadingData(false));
   }, []);
 
-  // Set initial instance selection after data loads
+  // Select initial instance 
   useEffect(() => {
-    if (instances.length) {
-      const initial =
-        instances.find((item) => item.id === queryInstanceId) || instances[0];
-      setSelectedInstanceId(initial?.id || null);
-    }
-  }, [instances, queryInstanceId]);
+    if (!instances.length) return;
+    const initial = instances.find((i) => i.id === queryInstanceId) ?? instances[0];
+    setSelectedInstanceId(initial?.id ?? null);
+  }, [instances]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch member attendance when instance changes
-  useEffect(() => {
-    const token = getStoredAccessToken();
-    if (selectedInstanceId) {
-      fetchMemberAttendance(token, selectedInstanceId)
-        .then((attendance) => {
-          // Map backend attendance to memberRows shape
-          setMemberRows(
-            (attendance || []).map((row) => ({
-              memberId: row.member_id,
-              name: row.member_name || `Member #${row.member_id}`,
-              status: row.attendance_status === "attended" ? "present" : "absent",
-            }))
+  // Load modal data 
+  const loadModalData = useCallback(
+    async (instanceId) => {
+      const token    = getStoredAccessToken();
+      const instance = instances.find((i) => i.id === instanceId);
+      if (!instance) return;
+
+      setLoadingModal(true);
+      setSaveError(null);
+      setLastSavedAt(null);
+
+      try {
+        if (instance.attendanceType === "general") {
+          const fresh = await fetchGeneralAttendance(token, instanceId).catch(() => null);
+          const gc    = fresh?.group_counts ?? instance._groupCounts ?? [];
+
+          setGeneralTotalCount(fresh?.attendee_count ?? instance.attendeeCount ?? 0);
+
+          // Start with zeros for every group, then fill in persisted values
+          const initial = Object.fromEntries(attendanceGroups.map((g) => [g.id, 0]));
+          gc.forEach(({ attendance_group_id, count }) => {
+            initial[attendance_group_id] = count;
+          });
+          setGroupCounts(initial);
+        } else {
+          const attendance = await fetchMemberAttendance(token, instanceId).catch(() => []);
+
+          const attendedIds = new Set(
+            (attendance ?? [])
+              .filter((r) => r.attendance_status === "attended")
+              .map((r) => r.member_id),
           );
-        })
-        .catch(() => setMemberRows([]));
-    } else {
-      setMemberRows([]);
-    }
-  }, [selectedInstanceId]);
 
-  // Build tagsById from tags
-  const tagsById = useMemo(
-    () => Object.fromEntries((tags || []).map((tag) => [tag.id, tag])),
-    [tags]
+          // Union of members already recorded + all known members
+          const allMemberIds = new Set([
+            ...Object.keys(membersById).map(Number),
+            ...(attendance ?? []).map((r) => r.member_id),
+          ]);
+
+          const rows = [...allMemberIds].map((mid) => {
+            const rec    = (attendance ?? []).find((r) => r.member_id === mid);
+            const member = membersById[mid];
+            return {
+              memberId: mid,
+              name:     rec?.member_name ?? member?.name ?? `Member #${mid}`,
+              status:   attendedIds.has(mid) ? "present" : "absent",
+            };
+          });
+          rows.sort((a, b) => a.name.localeCompare(b.name));
+          setMemberRows(rows);
+        }
+      } finally {
+        setLoadingModal(false);
+      }
+    },
+    [instances, attendanceGroups, membersById],
   );
 
-  const selectedInstance = useMemo(
-    () => instances.find((instance) => instance.id === selectedInstanceId) || null,
-    [instances, selectedInstanceId]
-  );
-
+  //  Filters 
   const filterOptions = useMemo(
     () => ({
-      attendanceTypes: [...new Set(instances.map((instance) => instance.attendanceType))],
-      days: [...new Set(instances.map((instance) => new Date(instance.startAt).toLocaleDateString(undefined, { weekday: "long" })))],
+      attendanceTypes: [...new Set(instances.map((i) => i.attendanceType))],
+      days: [...new Set(
+        instances.map((i) =>
+          new Date(i.startAt).toLocaleDateString(undefined, { weekday: "long" }),
+        ),
+      )],
     }),
-    [instances]
+    [instances],
   );
 
   const filteredInstances = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
-    return (instances || []).filter((instance) => {
-      const start = new Date(instance.startAt);
+    return instances.filter((instance) => {
+      const start        = new Date(instance.startAt);
       const startMinutes = start.getHours() * 60 + start.getMinutes();
-      const instanceDay = start.toLocaleDateString(undefined, { weekday: "long" });
-      const tagNames = (instance.tagIds || []).map((tagId) => tagsById[tagId]?.name ?? "").join(" ").toLowerCase();
+      const instanceDay  = start.toLocaleDateString(undefined, { weekday: "long" });
+      const tagNames     = instance.tagIds.map((id) => tagsById[id]?.name ?? "").join(" ").toLowerCase();
+
       const matchesSearch =
         !search ||
-        (instance.seriesName || "").toLowerCase().includes(search) ||
-        (instance.location || "").toLowerCase().includes(search) ||
-        (instance.attendanceType || "").toLowerCase().includes(search) ||
+        (instance.seriesName ?? "").toLowerCase().includes(search) ||
+        (instance.location   ?? "").toLowerCase().includes(search) ||
+        (instance.attendanceType ?? "").toLowerCase().includes(search) ||
         formatDate(instance.startAt).toLowerCase().includes(search) ||
         formatTimeRange(instance.startAt, instance.endAt).toLowerCase().includes(search) ||
         tagNames.includes(search);
+
       const matchesAttendanceType =
         filters.attendanceType === "all" || instance.attendanceType === filters.attendanceType;
       const matchesTag =
-        !filters.tagIds.length || filters.tagIds.every((selectedTagId) => (instance.tagIds || []).includes(selectedTagId));
+        !filters.tagIds.length ||
+        filters.tagIds.every((tid) => instance.tagIds.includes(tid));
       const matchesDay = filters.day === "all" || instanceDay === filters.day;
 
-      const afterDate = filters.dateAfter ? new Date(`${filters.dateAfter}T00:00:00`) : null;
-      const beforeDate = filters.dateBefore ? new Date(`${filters.dateBefore}T23:59:59`) : null;
-      const matchesDateAfter = !afterDate || start >= afterDate;
+      const afterDate         = filters.dateAfter  ? new Date(`${filters.dateAfter}T00:00:00`)  : null;
+      const beforeDate        = filters.dateBefore ? new Date(`${filters.dateBefore}T23:59:59`) : null;
+      const matchesDateAfter  = !afterDate  || start >= afterDate;
       const matchesDateBefore = !beforeDate || start <= beforeDate;
 
-      const afterMinutes = parseTimeToMinutes(filters.timeAfter);
-      const beforeMinutes = parseTimeToMinutes(filters.timeBefore);
-      const matchesTimeAfter = afterMinutes === null || startMinutes >= afterMinutes;
+      const afterMinutes      = parseTimeToMinutes(filters.timeAfter);
+      const beforeMinutes     = parseTimeToMinutes(filters.timeBefore);
+      const matchesTimeAfter  = afterMinutes  === null || startMinutes >= afterMinutes;
       const matchesTimeBefore = beforeMinutes === null || startMinutes <= beforeMinutes;
 
       return (
-        matchesSearch &&
-        matchesAttendanceType &&
-        matchesTag &&
-        matchesDay &&
-        matchesDateAfter &&
-        matchesDateBefore &&
-        matchesTimeAfter &&
-        matchesTimeBefore
+        matchesSearch && matchesAttendanceType && matchesTag && matchesDay &&
+        matchesDateAfter && matchesDateBefore && matchesTimeAfter && matchesTimeBefore
       );
     });
   }, [filters, tagsById, instances]);
 
-  const presentCount = useMemo(
-    () => memberRows.filter((member) => member.status === "present").length,
-    [memberRows]
+  // Derived values 
+  const selectedInstance = useMemo(
+    () => instances.find((i) => i.id === selectedInstanceId) ?? null,
+    [instances, selectedInstanceId],
   );
 
+  const presentCount = useMemo(
+    () => memberRows.filter((m) => m.status === "present").length,
+    [memberRows],
+  );
+
+  // Handlers 
   const handleOpenInstance = (instanceId) => {
     setSelectedInstanceId(instanceId);
     setGeneralTotalCount(0);
-    setGroupCounts(buildInitialGroupCounts(attendanceGroups));
-    setMemberRows([]); // Will be loaded by useEffect
+    setGroupCounts({});
+    setMemberRows([]);
     setNotes("");
     setLastSavedAt(null);
+    loadModalData(instanceId);
   };
 
   const handleCloseInstance = () => {
     setSelectedInstanceId(null);
     setLastSavedAt(null);
+    setSaveError(null);
   };
 
-  // Save attendance handler (example for member attendance)
   const handleSaveAttendance = async () => {
     const token = getStoredAccessToken();
     if (!selectedInstance) return;
+    setSaving(true);
+    setSaveError(null);
     try {
       if (selectedInstance.attendanceType === "general") {
-        // Save general attendance
-        await apiFetch(
-          "/attendance/general",
-          token,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              event_instance_id: selectedInstance.id,
-              attendee_count: generalTotalCount,
-              group_counts: Object.entries(groupCounts).map(([attendance_group_id, count]) => ({ attendance_group_id: Number(attendance_group_id), count })),
-            }),
-          }
-        );
+        await upsertGeneralAttendance(token, {
+          event_instance_id: selectedInstance.id,
+          attendee_count:    generalTotalCount,
+          group_counts: Object.entries(groupCounts).map(([attendance_group_id, count]) => ({
+            attendance_group_id: Number(attendance_group_id),
+            count,
+          })),
+        });
       } else {
-        // Save member attendance
-        await Promise.all(
-          memberRows.map((row) =>
-            apiFetch(
-              "/attendance/member",
-              token,
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  event_instance_id: selectedInstance.id,
-                  member_id: row.memberId,
-                  attendance_status: row.status === "present" ? "attended" : "absent",
-                  registration_status: "registered",
-                }),
-              }
-            )
-          )
-        );
+        for (const row of memberRows) {
+          await upsertMemberAttendance(token, {
+            event_instance_id:   selectedInstance.id,
+            member_id:           row.memberId,
+            attendance_status:   row.status === "present" ? "attended" : "absent",
+            registration_status: "registered",
+          });
+        }
       }
       setLastSavedAt(new Date().toISOString());
     } catch (err) {
-      alert("Failed to save attendance");
+      setSaveError(err.message ?? "Failed to save attendance. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
+  // Render 
   return (
     <section className="attendance-page">
       <header className="attendance-header">
@@ -293,85 +325,110 @@ export default function AttendancePage() {
           </p>
         </div>
         <div className="events-actions">
-          <button type="button" className="members-secondary-button" onClick={() => setFiltersOpen((value) => !value)}>
+          <button
+            type="button"
+            className="members-secondary-button"
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
             Filters
           </button>
         </div>
       </header>
 
-      <div className="events-series-list" role="list" aria-label="Attendance instances">
-        {filteredInstances.length ? (
-          filteredInstances.map((instance) => {
-          return (
-            <article
-              key={instance.id}
-              className="event-series-row"
-              role="listitem button"
-              tabIndex={0}
-              onClick={() => handleOpenInstance(instance.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  handleOpenInstance(instance.id);
-                }
-              }}
-              aria-label={`Open attendance register for ${instance.seriesName}`}
-            >
-              <div className="event-series-main">
-                <h3>{instance.seriesName}</h3>
-                <p>{instance.attendanceType} attendance</p>
-                <div className="event-series-badges">
-                  <span className="event-series-badge event-series-badge-attendance">{instance.attendanceType}</span>
-                </div>
-              </div>
+      {loadingData && <p className="events-register-empty">Loading instances…</p>}
+      {dataError   && (
+        <p className="events-register-empty" style={{ color: "var(--color-danger, red)" }}>
+          {dataError}
+        </p>
+      )}
 
-              <div className="event-series-tags-section">
-                <span className="event-series-section-label">Tags</span>
-                <div className="event-series-tag-list">
-                  {instance.tagIds.length ? (
-                    instance.tagIds.map((tagId) => {
-                      const tag = tagsById[tagId];
-                      if (!tag) {
-                        return null;
-                      }
+      {!loadingData && (
+        <>
+          <div className="events-series-list" role="list" aria-label="Attendance instances">
+            {filteredInstances.length ? (
+              filteredInstances.map((instance) => (
+                <article
+                  key={instance.id}
+                  className="event-series-row"
+                  role="listitem button"
+                  tabIndex={0}
+                  onClick={() => handleOpenInstance(instance.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleOpenInstance(instance.id);
+                    }
+                  }}
+                  aria-label={`Open attendance register for ${instance.seriesName}`}
+                >
+                  <div className="event-series-main">
+                    <h3>{instance.seriesName}</h3>
+                    <p>{instance.attendanceType} attendance</p>
+                    <div className="event-series-badges">
+                      <span className="event-series-badge event-series-badge-attendance">
+                        {instance.attendanceType}
+                      </span>
+                    </div>
+                  </div>
 
-                      return (
-                        <span key={`attendance-tag-${instance.id}-${tag.id}`} className="events-tag-pill" style={{ borderColor: tag.color, color: tag.color }}>
-                          {tag.name}
-                        </span>
-                      );
-                    })
-                  ) : (
-                    <span className="event-series-empty">No tags</span>
-                  )}
-                </div>
-              </div>
+                  <div className="event-series-tags-section">
+                    <span className="event-series-section-label">Tags</span>
+                    <div className="event-series-tag-list">
+                      {instance.tagIds.length ? (
+                        instance.tagIds.map((tagId) => {
+                          const tag = tagsById[tagId];
+                          if (!tag) return null;
+                          return (
+                            <span
+                              key={`attendance-tag-${instance.id}-${tag.id}`}
+                              className="events-tag-pill"
+                              style={{ borderColor: tag.color, color: tag.color }}
+                            >
+                              {tag.name}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="event-series-empty">No tags</span>
+                      )}
+                    </div>
+                  </div>
 
-              <p className="event-series-meta">
-                <span>Date</span>
-                <strong>{formatDate(instance.startAt)}</strong>
+                  <p className="event-series-meta">
+                    <span>Date</span>
+                    <strong>{formatDate(instance.startAt)}</strong>
+                  </p>
+                  <p className="event-series-meta">
+                    <span>Time</span>
+                    <strong>{formatTimeRange(instance.startAt, instance.endAt)}</strong>
+                  </p>
+                  <p className="event-series-meta">
+                    <span>Location</span>
+                    <strong>{instance.location || "—"}</strong>
+                  </p>
+                </article>
+              ))
+            ) : (
+              <p className="events-register-empty">
+                No attendance instances match your current filters.
               </p>
-              <p className="event-series-meta">
-                <span>Time</span>
-                <strong>{formatTimeRange(instance.startAt, instance.endAt)}</strong>
-              </p>
-              <p className="event-series-meta">
-                <span>Location</span>
-                <strong>{instance.location}</strong>
-              </p>
-            </article>
-          );
-          })
-        ) : (
-          <p className="events-register-empty">No attendance instances match your current filters.</p>
-        )}
-      </div>
+            )}
+          </div>
+          <p className="events-count">Showing {filteredInstances.length} attendance instances</p>
+        </>
+      )}
 
-      <p className="events-count">Showing {filteredInstances.length} attendance instances</p>
-
-      {filtersOpen ? (
-        <div className="members-drawer-backdrop" onClick={() => setFiltersOpen(false)} role="presentation">
-          <aside className="members-drawer members-filter-drawer" onClick={(event) => event.stopPropagation()}>
+      {/* ── Filters drawer ── */}
+      {filtersOpen && (
+        <div
+          className="members-drawer-backdrop"
+          onClick={() => setFiltersOpen(false)}
+          role="presentation"
+        >
+          <aside
+            className="members-drawer members-filter-drawer"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="members-panel-head">
               <h3>Attendance Filters</h3>
               <button type="button" className="members-text-button" onClick={() => setFiltersOpen(false)}>
@@ -384,7 +441,7 @@ export default function AttendancePage() {
                 Search
                 <input
                   value={filters.search}
-                  onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                  onChange={(e) => setFilters((c) => ({ ...c, search: e.target.value }))}
                   placeholder="Series, location, date, time, tags"
                 />
               </label>
@@ -393,25 +450,24 @@ export default function AttendancePage() {
                 Attendance Type
                 <select
                   value={filters.attendanceType}
-                  onChange={(event) => setFilters((current) => ({ ...current, attendanceType: event.target.value }))}
+                  onChange={(e) => setFilters((c) => ({ ...c, attendanceType: e.target.value }))}
                 >
                   <option value="all">All</option>
                   {filterOptions.attendanceTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
+                    <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
               </label>
 
               <label>
                 Day
-                <select value={filters.day} onChange={(event) => setFilters((current) => ({ ...current, day: event.target.value }))}>
+                <select
+                  value={filters.day}
+                  onChange={(e) => setFilters((c) => ({ ...c, day: e.target.value }))}
+                >
                   <option value="all">All</option>
                   {filterOptions.days.map((day) => (
-                    <option key={day} value={day}>
-                      {day}
-                    </option>
+                    <option key={day} value={day}>{day}</option>
                   ))}
                 </select>
               </label>
@@ -421,7 +477,7 @@ export default function AttendancePage() {
                 <input
                   type="date"
                   value={filters.dateAfter}
-                  onChange={(event) => setFilters((current) => ({ ...current, dateAfter: event.target.value }))}
+                  onChange={(e) => setFilters((c) => ({ ...c, dateAfter: e.target.value }))}
                 />
               </label>
 
@@ -430,7 +486,7 @@ export default function AttendancePage() {
                 <input
                   type="date"
                   value={filters.dateBefore}
-                  onChange={(event) => setFilters((current) => ({ ...current, dateBefore: event.target.value }))}
+                  onChange={(e) => setFilters((c) => ({ ...c, dateBefore: e.target.value }))}
                 />
               </label>
 
@@ -439,7 +495,7 @@ export default function AttendancePage() {
                 <input
                   type="time"
                   value={filters.timeAfter}
-                  onChange={(event) => setFilters((current) => ({ ...current, timeAfter: event.target.value }))}
+                  onChange={(e) => setFilters((c) => ({ ...c, timeAfter: e.target.value }))}
                 />
               </label>
 
@@ -448,7 +504,7 @@ export default function AttendancePage() {
                 <input
                   type="time"
                   value={filters.timeBefore}
-                  onChange={(event) => setFilters((current) => ({ ...current, timeBefore: event.target.value }))}
+                  onChange={(e) => setFilters((c) => ({ ...c, timeBefore: e.target.value }))}
                 />
               </label>
 
@@ -458,28 +514,24 @@ export default function AttendancePage() {
                   <button
                     type="button"
                     className={`events-tag-picker-item ${!filters.tagIds.length ? "events-tag-picker-item-selected" : ""}`}
-                    onClick={() => setFilters((current) => ({ ...current, tagIds: [] }))}
+                    onClick={() => setFilters((c) => ({ ...c, tagIds: [] }))}
                   >
                     All tags
                   </button>
-                  {MOCK_ATTENDANCE_TAGS.map((tag) => {
+                  {Object.values(tagsById).map((tag) => {
                     const selected = filters.tagIds.includes(tag.id);
-
                     return (
                       <button
                         key={tag.id}
                         type="button"
                         className={`events-tag-picker-item ${selected ? "events-tag-picker-item-selected" : ""}`}
                         onClick={() =>
-                          setFilters((current) => {
-                            const isSelected = current.tagIds.includes(tag.id);
-                            return {
-                              ...current,
-                              tagIds: isSelected
-                                ? current.tagIds.filter((value) => value !== tag.id)
-                                : [...current.tagIds, tag.id],
-                            };
-                          })
+                          setFilters((c) => ({
+                            ...c,
+                            tagIds: selected
+                              ? c.tagIds.filter((id) => id !== tag.id)
+                              : [...c.tagIds, tag.id],
+                          }))
                         }
                         style={{ borderColor: tag.color }}
                       >
@@ -491,17 +543,29 @@ export default function AttendancePage() {
                 </div>
               </fieldset>
 
-              <button type="button" className="members-secondary-button" onClick={() => setFilters(DEFAULT_FILTERS)}>
+              <button
+                type="button"
+                className="members-secondary-button"
+                onClick={() => setFilters(DEFAULT_FILTERS)}
+              >
                 Clear Filters
               </button>
             </div>
           </aside>
         </div>
-      ) : null}
+      )}
 
-      {selectedInstance ? (
-        <div className="members-drawer-backdrop events-modal-backdrop" onClick={handleCloseInstance} role="presentation">
-          <aside className="events-modal-card events-detail-modal" onClick={(event) => event.stopPropagation()}>
+      {/* ── Attendance modal ── */}
+      {selectedInstance && (
+        <div
+          className="members-drawer-backdrop events-modal-backdrop"
+          onClick={handleCloseInstance}
+          role="presentation"
+        >
+          <aside
+            className="events-modal-card events-detail-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="members-panel-head">
               <h3>{selectedInstance.seriesName}</h3>
               <button type="button" className="members-text-button" onClick={handleCloseInstance}>
@@ -513,13 +577,19 @@ export default function AttendancePage() {
               <div className="attendance-editor-head">
                 <div>
                   <p>
-                    {formatDateTime(selectedInstance.startAt)} - {formatDateTime(selectedInstance.endAt)}
+                    {formatDateTime(selectedInstance.startAt)} —{" "}
+                    {formatDateTime(selectedInstance.endAt)}
                   </p>
                 </div>
-                <span className="attendance-mode-chip">{selectedInstance.attendanceType} attendance</span>
+                <span className="attendance-mode-chip">
+                  {selectedInstance.attendanceType} attendance
+                </span>
               </div>
 
-              {selectedInstance.attendanceType === "general" ? (
+              {loadingModal ? (
+                <p className="events-register-empty">Loading attendance data…</p>
+              ) : selectedInstance.attendanceType === "general" ? (
+                /* ── General attendance ── */
                 <div className="attendance-form-grid">
                   <label>
                     Total Attendees
@@ -527,43 +597,48 @@ export default function AttendancePage() {
                       type="number"
                       min="0"
                       value={generalTotalCount}
-                      onChange={(event) => setGeneralTotalCount(Number(event.target.value || 0))}
+                      onChange={(e) => setGeneralTotalCount(Number(e.target.value || 0))}
                     />
                   </label>
 
-                  <fieldset className="attendance-groups-fieldset">
-                    <legend>Attendance Groups</legend>
-                    <div className="attendance-groups-grid">
-                      {MOCK_ATTENDANCE_GROUPS.map((group) => (
-                        <label key={group.id}>
-                          {group.label}
-                          <input
-                            type="number"
-                            min="0"
-                            value={groupCounts[group.id]}
-                            onChange={(event) =>
-                              setGroupCounts((current) => ({
-                                ...current,
-                                [group.id]: Number(event.target.value || 0),
-                              }))
-                            }
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
+                  {attendanceGroups.length > 0 && (
+                    <fieldset className="attendance-groups-fieldset">
+                      <legend>Attendance Groups</legend>
+                      <div className="attendance-groups-grid">
+                        {attendanceGroups.map((group) => (
+                          <label key={group.id}>
+                            {group.name}
+                            <input
+                              type="number"
+                              min="0"
+                              value={groupCounts[group.id] ?? 0}
+                              onChange={(e) =>
+                                setGroupCounts((c) => ({
+                                  ...c,
+                                  [group.id]: Number(e.target.value || 0),
+                                }))
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
                 </div>
               ) : (
+                /* ── Member attendance ── */
                 <div className="attendance-form-grid">
                   <div className="attendance-roster-actions">
-                    <p className="attendance-roster-count">Present: {presentCount} / {memberRows.length}</p>
+                    <p className="attendance-roster-count">
+                      Present: {presentCount} / {memberRows.length}
+                    </p>
                     <div className="attendance-roster-buttons">
                       <button
                         type="button"
                         className="members-secondary-button"
                         disabled={!memberRows.length}
                         onClick={() =>
-                          setMemberRows((current) => current.map((member) => ({ ...member, status: "present" })))
+                          setMemberRows((rows) => rows.map((m) => ({ ...m, status: "present" })))
                         }
                       >
                         Mark All Present
@@ -573,7 +648,7 @@ export default function AttendancePage() {
                         className="members-secondary-button"
                         disabled={!memberRows.length}
                         onClick={() =>
-                          setMemberRows((current) => current.map((member) => ({ ...member, status: "absent" })))
+                          setMemberRows((rows) => rows.map((m) => ({ ...m, status: "absent" })))
                         }
                       >
                         Clear All
@@ -581,9 +656,15 @@ export default function AttendancePage() {
                     </div>
                   </div>
 
-                  <div className="attendance-member-list" role="list" aria-label="Member attendance list">
+                  <div
+                    className="attendance-member-list"
+                    role="list"
+                    aria-label="Member attendance list"
+                  >
                     {!memberRows.length ? (
-                      <p className="members-empty-state">No registered members for this instance.</p>
+                      <p className="members-empty-state">
+                        No members found. Add members first.
+                      </p>
                     ) : (
                       memberRows.map((member) => (
                         <div key={member.memberId} className="attendance-member-row" role="listitem">
@@ -593,10 +674,10 @@ export default function AttendancePage() {
                               type="button"
                               className={`attendance-toggle-button ${member.status === "present" ? "attendance-toggle-active" : ""}`}
                               onClick={() =>
-                                setMemberRows((current) =>
-                                  current.map((item) =>
-                                    item.memberId === member.memberId ? { ...item, status: "present" } : item
-                                  )
+                                setMemberRows((rows) =>
+                                  rows.map((m) =>
+                                    m.memberId === member.memberId ? { ...m, status: "present" } : m,
+                                  ),
                                 )
                               }
                             >
@@ -606,10 +687,10 @@ export default function AttendancePage() {
                               type="button"
                               className={`attendance-toggle-button ${member.status === "absent" ? "attendance-toggle-active" : ""}`}
                               onClick={() =>
-                                setMemberRows((current) =>
-                                  current.map((item) =>
-                                    item.memberId === member.memberId ? { ...item, status: "absent" } : item
-                                  )
+                                setMemberRows((rows) =>
+                                  rows.map((m) =>
+                                    m.memberId === member.memberId ? { ...m, status: "absent" } : m,
+                                  ),
                                 )
                               }
                             >
@@ -627,23 +708,37 @@ export default function AttendancePage() {
                 Notes
                 <textarea
                   value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
+                  onChange={(e) => setNotes(e.target.value)}
                   placeholder="Optional notes for this attendance session"
                   rows={3}
                 />
               </label>
 
+              {saveError && (
+                <p style={{ color: "var(--color-danger, red)", marginBottom: "0.5rem" }}>
+                  {saveError}
+                </p>
+              )}
+
               <div className="attendance-actions-row">
-                {lastSavedAt ? <p className="attendance-saved-at">Last saved: {formatDateTime(lastSavedAt)}</p> : <span />}
-                <button type="button" className="members-primary-button" onClick={handleSaveAttendance}>
-                  Save Attendance
+                {lastSavedAt ? (
+                  <p className="attendance-saved-at">Last saved: {formatDateTime(lastSavedAt)}</p>
+                ) : (
+                  <span />
+                )}
+                <button
+                  type="button"
+                  className="members-primary-button"
+                  onClick={handleSaveAttendance}
+                  disabled={saving || loadingModal}
+                >
+                  {saving ? "Saving…" : "Save Attendance"}
                 </button>
               </div>
             </section>
           </aside>
         </div>
-      ) : null}
+      )}
     </section>
   );
-
 }

@@ -231,6 +231,8 @@ export async function deleteGroupMembership(token, membershipId) {
 export const fetchAttendanceGroups = (token) => apiFetch("/attendance-groups", token);
 export const fetchMemberAttendance = (token, instanceId) =>
     apiFetch(`/attendance/members${instanceId ? `?event_instance_id=${instanceId}` : ""}`, token);
+export const fetchGeneralAttendance = (token, instanceId) =>
+    apiFetch(`/event-instances/${instanceId}`, token);
 export async function upsertGeneralAttendance(token, payload) {
     return apiFetch("/attendance/general", token, {
         method: "POST",
