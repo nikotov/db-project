@@ -135,11 +135,11 @@ export default function AttendancePage() {
       .finally(() => setLoadingData(false));
   }, []);
 
-  // Select initial instance 
+  // Select initial instance (only when a valid instanceId is in the URL)
   useEffect(() => {
-    if (!instances.length) return;
-    const initial = instances.find((i) => i.id === queryInstanceId) ?? instances[0];
-    setSelectedInstanceId(initial?.id ?? null);
+    if (!instances.length || !queryInstanceId) return;
+    const initial = instances.find((i) => i.id === queryInstanceId);
+    if (initial) setSelectedInstanceId(initial.id);
   }, [instances]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load modal data 
