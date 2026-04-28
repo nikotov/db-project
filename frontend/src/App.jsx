@@ -4,7 +4,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-
 import { fetchDashboardMetrics, login } from "./api/client";
 import LoginView from "./modules/login/LoginView";
 import CommunityShell from "./modules/community/CommunityShell";
-import DashboardPage from "./modules/community/dashboard/DashboardPage";
+import DashboardContainer from "./modules/community/dashboard/DashboardContainer";
 import MembersPage from "./modules/community/members/MembersPage";
 import FamiliesPage from "./modules/community/families/FamiliesPage";
 import CalendarPage from "./modules/community/calendar/CalendarPage";
@@ -171,7 +171,7 @@ export default function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route
             path="dashboard"
-            element={<DashboardPage dashboardLoading={dashboardLoading} metrics={metrics} />}
+            element={<DashboardContainer />}
           />
           <Route path="members" element={<MembersPage />} />
           <Route path="families" element={<FamiliesPage />} />

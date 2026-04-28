@@ -44,7 +44,7 @@ export function getStoredAccessToken() {
 
 export async function fetchDashboardMetrics(token) {
     try {
-        const response = await fetch(`${API_PREFIX}/members/count`, {
+        const response = await fetch(`${API_PREFIX}/dashboard/metrics`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) return DASHBOARD_FALLBACK;

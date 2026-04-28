@@ -3,6 +3,7 @@ from fastapi import APIRouter
 
 from app.adapters.input.http.routes import auth, health, members
 from app.adapters.input.http.routes import (
+    dashboard,
     event_tags,
     event_series,
     event_instances,
@@ -43,3 +44,6 @@ router.include_router(member_status.router)
 # Admin / audit
 router.include_router(user_logs.router)
 router.include_router(users.router)
+
+# Dashboard
+router.include_router(dashboard.router)
