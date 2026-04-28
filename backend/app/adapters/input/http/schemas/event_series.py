@@ -1,8 +1,8 @@
 """HTTP schemas for event-series, event-instance and event-tag routes."""
 from datetime import date, datetime, time
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.enums.event_series_status import EventSeriesStatus
 from app.domain.enums.recurrence_type import RecurrenceType
@@ -94,10 +94,11 @@ class EventInstanceResponse(BaseModel):
     tags: list[EventTagResponse] = Field(default_factory=list)
     group_counts: list[GroupCountResponse] = Field(default_factory=list)
 
+    @model_validator(mode="wrap")
     @classmethod
-    def model_validate(cls, obj, *args, **kwargs):
-        instance = super().model_validate(obj, *args, **kwargs)
-        # Populate denormalized fields from the joined series relationship
+    def _populate_series_fields(cls, obj: Any, handler: Any) -> "EventInstanceResponse":
+        # Run the standard Pydantic validation first (maps ORM columns → fields)
+        instance: EventInstanceResponse = handler(obj)
         if hasattr(obj, "series") and obj.series is not None:
             instance.series_name = obj.series.name
             instance.attendance_type = obj.series.attendance_type
