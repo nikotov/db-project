@@ -1,8 +1,10 @@
 """HTTP schemas for event-series, event-instance and event-tag routes."""
-from datetime import date, datetime, time
+from datetime import date, time
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.adapters.input.http.schemas.base import UtcDatetime
 
 from app.domain.enums.event_series_status import EventSeriesStatus
 from app.domain.enums.recurrence_type import RecurrenceType
@@ -50,8 +52,8 @@ class EventSeriesResponse(BaseModel):
     location: Optional[str]
     start_time: Optional[time]
     end_time: Optional[time]
-    created_at: datetime
-    updated_at: Optional[datetime]
+    created_at: UtcDatetime
+    updated_at: Optional[UtcDatetime]
     tags: list[EventTagResponse] = Field(default_factory=list)
 
 
@@ -66,8 +68,8 @@ class EventSeriesGenerateInstancesRequest(BaseModel):
 
 class EventInstanceCreate(BaseModel):
     event_series_id: int = Field(ge=1)
-    start_datetime: datetime
-    end_datetime: datetime
+    start_datetime: UtcDatetime
+    end_datetime: UtcDatetime
     location: Optional[str] = Field(default=None, max_length=255)
     attendance_notes: Optional[str] = Field(default=None, max_length=500)
     attendee_count: int = Field(default=0, ge=0)
@@ -83,8 +85,8 @@ class EventInstanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     event_series_id: int
-    start_datetime: datetime
-    end_datetime: datetime
+    start_datetime: UtcDatetime
+    end_datetime: UtcDatetime
     location: Optional[str]
     attendance_notes: Optional[str]
     attendee_count: int
@@ -99,6 +101,10 @@ class EventInstanceResponse(BaseModel):
     def _populate_series_fields(cls, obj: Any, handler: Any) -> "EventInstanceResponse":
         # Run the standard Pydantic validation first (maps ORM columns → fields)
         instance: EventInstanceResponse = handler(obj)
+        # Then pull denormalized fields from the joined `series` relationship.
+        # This runs for *every* validation path (single object, list, nested),
+        # unlike the old `model_validate` classmethod override which was
+        # bypassed by Pydantic's internal list validator.
         if hasattr(obj, "series") and obj.series is not None:
             instance.series_name = obj.series.name
             instance.attendance_type = obj.series.attendance_type

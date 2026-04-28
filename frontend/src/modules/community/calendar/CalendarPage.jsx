@@ -31,11 +31,17 @@ function addDays(date, days) {
 }
 
 function formatDateKey(value) {
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  // Use Intl so the date parts reflect the correct local date for the timezone,
+  // not the browser's tz (which may differ from the server's stored UTC times)
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(value);
+  const p = Object.fromEntries(parts.map(({ type, value: v }) => [type, v]));
+  return `${p.year}-${p.month}-${p.day}`;
 }
 
+const TZ = "America/Guayaquil";
+
 function formatDate(value, options) {
-  return new Intl.DateTimeFormat("en-US", options).format(value);
+  return new Intl.DateTimeFormat("en-US", { timeZone: TZ, ...options }).format(value);
 }
 
 function hourLabel(hour24) {
@@ -45,7 +51,9 @@ function hourLabel(hour24) {
 }
 
 function getMinutesFromDate(value) {
-  return value.getHours() * 60 + value.getMinutes();
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "numeric", hour12: false }).formatToParts(value);
+  const p = Object.fromEntries(parts.map(({ type, value: v }) => [type, v]));
+  return Number(p.hour) * 60 + Number(p.minute);
 }
 
 function formatDateTime(value) {

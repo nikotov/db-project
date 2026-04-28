@@ -1,7 +1,7 @@
 """HTTP schemas for user management routes."""
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.adapters.input.http.schemas.base import UtcDatetime
 
 
 class UserResponse(BaseModel):
@@ -10,8 +10,8 @@ class UserResponse(BaseModel):
     id: int
     username: str
     role: str
-    created_at: datetime
-    last_login: datetime | None
+    created_at: UtcDatetime
+    last_login: UtcDatetime | None
 
 
 class UserCreateRequest(BaseModel):

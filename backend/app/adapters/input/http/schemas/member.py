@@ -1,9 +1,10 @@
 """HTTP schemas for member routes."""
-from datetime import date, datetime
+from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import Gender, MaritalStatus
+from app.adapters.input.http.schemas.base import UtcDatetime
 
 
 class MemberResponse(BaseModel):
@@ -21,8 +22,8 @@ class MemberResponse(BaseModel):
     gender: Gender
     phone: str | None
     email: str | None
-    created_at: datetime
-    updated_at: datetime | None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime | None
     marital_status: MaritalStatus | None
     family_role: str | None
     is_baptized: bool | None

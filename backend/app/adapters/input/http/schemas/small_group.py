@@ -1,9 +1,10 @@
 """HTTP schemas for small-group routes."""
-from datetime import datetime, time
+from datetime import time
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.adapters.input.http.schemas.base import UtcDatetime
 from app.domain.enums.day_of_week import DayOfWeek
 from app.domain.enums.small_group_status import SmallGroupStatus
 from app.domain.enums.group_membership_status import GroupMembershipStatus
@@ -44,8 +45,8 @@ class SmallGroupResponse(BaseModel):
     meeting_time: time
     location: Optional[str]
     status: SmallGroupStatus
-    created_at: datetime
-    updated_at: Optional[datetime]
+    created_at: UtcDatetime
+    updated_at: Optional[UtcDatetime]
     tags: list[SmallGroupTagResponse] = Field(default_factory=list)
 
 
@@ -63,5 +64,5 @@ class GroupMembershipResponse(BaseModel):
     member_id: int
     small_group_id: int
     role: GroupMembershipStatus
-    joined_at: datetime
-    left_at: Optional[datetime]
+    joined_at: UtcDatetime
+    left_at: Optional[UtcDatetime]
